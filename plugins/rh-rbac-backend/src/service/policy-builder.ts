@@ -1,7 +1,4 @@
-import {
-  PluginEndpointDiscovery,
-  resolvePackagePath,
-} from '@backstage/backend-common';
+import { PluginEndpointDiscovery } from '@backstage/backend-common';
 import { Config } from '@backstage/config';
 import {
   getBearerTokenFromAuthorizationHeader,
@@ -17,9 +14,7 @@ import {
 } from '@backstage/plugin-permission-common';
 import { createPermissionIntegrationRouter } from '@backstage/plugin-permission-node';
 
-import { FileAdapter } from 'casbin';
 import { Router } from 'express';
-import TypeORMAdapter from 'typeorm-adapter';
 import { Logger } from 'winston';
 
 import {
@@ -27,6 +22,7 @@ import {
   permissionEntityReadPermission,
   RESOURCE_TYPE_PERMISSION_ENTITY,
 } from '../permissions';
+import { AdapterFactory } from './casbin-adapter-factory';
 import { RBACPermissionPolicy } from './permission-policy';
 
 export class PolicyBuilder {
@@ -36,33 +32,10 @@ export class PolicyBuilder {
     discovery: PluginEndpointDiscovery;
     identity: IdentityApi;
     permissions: PermissionEvaluator;
+    adapterFactory: AdapterFactory;
   }): Promise<Router> {
-    let adapter;
-    const databaseEnabled = env.config.getOptionalBoolean(
-      'permission.database.enabled',
-    );
-
     const permissions = env.permissions;
-
-    // Database adapter work
-    if (databaseEnabled) {
-      const databaseConfig = env.config.getOptionalConfig('backend.database');
-      adapter = await TypeORMAdapter.newAdapter({
-        type: 'postgres',
-        host: databaseConfig?.getString('connection.host'),
-        port: databaseConfig?.getNumber('connection.port'),
-        username: databaseConfig?.getString('connection.user'),
-        password: databaseConfig?.getString('connection.password'),
-        database: env.config.getOptionalString('permission.database.name'),
-      });
-    } else {
-      adapter = new FileAdapter(
-        resolvePackagePath(
-          '@janus-idp/plugin-rh-rbac-backend',
-          './model/rbac-policy.csv',
-        ),
-      );
-    }
+    const adapter = await env.adapterFactory.createAdapter();
 
     const options: RouterOptions = {
       config: env.config,

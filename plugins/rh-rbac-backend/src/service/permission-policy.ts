@@ -14,7 +14,13 @@ import {
   PolicyQuery,
 } from '@backstage/plugin-permission-node';
 
-import { Adapter, Enforcer, newEnforcer, newModelFromString } from 'casbin';
+import {
+  Adapter,
+  Enforcer,
+  newEnforcer,
+  newModelFromString,
+  StringAdapter,
+} from 'casbin';
 import { Logger } from 'winston';
 
 const MODEL = `
@@ -27,15 +33,31 @@ p = sub, obj, act, eft
 [policy_effect]
 e = some(where (p.eft == allow)) && !some(where (p.eft == deny))
 
+[role_definition]
+g = _, _
+
 [matchers]
 m = r.sub == p.sub && r.obj == p.obj && r.act == p.act
 `;
 
-const useAdmins = (admins: Config[], enf: Enforcer) => {
+const useAdmins = (admins: Config[], enf: Enforcer, log: Logger) => {
   admins.flatMap(async localConfig => {
     const name = localConfig.getString('name');
     const adminPermission = [name, 'permission-entity', 'read', 'allow'];
-    await enf.addPolicy(...adminPermission);
+
+    if (!(await enf.hasPolicy(...adminPermission))) {
+      await enf.addPolicy(...adminPermission);
+
+      // Our unit tests uses StringAdapter, but it doesn't support save policies.
+      if (!(enf.getAdapter() instanceof StringAdapter)) {
+        const ok = await enf.savePolicy();
+        if (!ok) {
+          log.error(
+            `Unable to save admin record for user ${name} to the permission storage.`,
+          );
+        }
+      }
+    }
   });
 };
 
@@ -59,11 +81,11 @@ export class RBACPermissionPolicy implements PermissionPolicy {
     const enf = await newEnforcer(theModel, policyAdapter);
 
     if (adminUsers) {
-      useAdmins(adminUsers, enf);
+      useAdmins(adminUsers, enf, logger);
     }
 
     if (adminGroups) {
-      useAdmins(adminGroups, enf);
+      useAdmins(adminGroups, enf, logger);
     }
 
     return new RBACPermissionPolicy(enf, logger);
