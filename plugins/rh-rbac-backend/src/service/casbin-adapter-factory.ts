@@ -4,9 +4,13 @@ import { ConfigApi } from '@backstage/core-plugin-api';
 import { Adapter } from 'casbin';
 import TypeORMAdapter from 'typeorm-adapter';
 
+import { resolve } from 'path';
+
 export interface AdapterFactory {
   createAdapter(): Promise<Adapter>;
 }
+
+const DEFAULT_SQLITE3_STORAGE_FILE_NAME = 'rh-rbac-backend.sqlite';
 
 export class CasbinAdapterFactory implements AdapterFactory {
   public constructor(
@@ -33,11 +37,20 @@ export class CasbinAdapterFactory implements AdapterFactory {
     }
 
     if (client === 'better-sqlite3') {
-      // Storage type or path to the storage.
-      const storage = databaseConfig?.getString('connection') || ':memory:';
+      let storage;
+      if (typeof databaseConfig?.get('connection')?.valueOf() === 'string') {
+        storage = databaseConfig?.getString('connection');
+      } else {
+        if (databaseConfig?.has('connection.directory')) {
+          const storageDir = databaseConfig?.getString('connection.directory');
+          storage = resolve(storageDir, DEFAULT_SQLITE3_STORAGE_FILE_NAME);
+        }
+      }
+
       adapter = await TypeORMAdapter.newAdapter({
         type: 'better-sqlite3',
-        database: storage,
+        // Storage type or path to the storage.
+        database: storage || ':memory:',
       });
     }
 
