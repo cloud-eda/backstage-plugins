@@ -43,19 +43,18 @@ m = r.sub == p.sub && r.obj == p.obj && r.act == p.act
 const useAdmins = (admins: Config[], enf: Enforcer, log: Logger) => {
   admins.flatMap(async localConfig => {
     const name = localConfig.getString('name');
-    const adminPermission = [name, 'permission-entity', 'read', 'allow'];
+    const adminReadPermission = [name, 'policy-entity', 'read', 'allow'];
+    await enf.addPolicy(...adminReadPermission);
+    const adminCreatePermission = [name, 'policy-entity', 'create', 'allow'];
+    await enf.addPolicy(...adminCreatePermission);
 
-    if (!(await enf.hasPolicy(...adminPermission))) {
-      await enf.addPolicy(...adminPermission);
-
-      // Our unit tests uses StringAdapter, but it doesn't support save policies.
-      if (!(enf.getAdapter() instanceof StringAdapter)) {
-        const ok = await enf.savePolicy();
-        if (!ok) {
-          log.error(
-            `Unable to save admin record for user ${name} to the permission storage.`,
-          );
-        }
+    // Our unit tests uses StringAdapter, but it doesn't support save policies.
+    if (!(enf.getAdapter() instanceof StringAdapter)) {
+      const ok = await enf.savePolicy();
+      if (!ok) {
+        log.error(
+          `Unable to save admin record for user ${name} to the permission storage.`,
+        );
       }
     }
   });
@@ -73,19 +72,12 @@ export class RBACPermissionPolicy implements PermissionPolicy {
     const theModel = newModelFromString(MODEL);
 
     const adminUsers = configApi.getOptionalConfigArray(
-      'permission.admin.users',
-    );
-    const adminGroups = configApi.getOptionalConfigArray(
-      'permission.admin.groups',
+      'permission.rbac.admin.users',
     );
     const enf = await newEnforcer(theModel, policyAdapter);
 
     if (adminUsers) {
       useAdmins(adminUsers, enf, logger);
-    }
-
-    if (adminGroups) {
-      useAdmins(adminGroups, enf, logger);
     }
 
     return new RBACPermissionPolicy(enf, logger);

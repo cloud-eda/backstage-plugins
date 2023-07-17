@@ -7,7 +7,7 @@ import { Adapter, Model } from 'casbin';
 import express from 'express';
 import request from 'supertest';
 
-import { permissionEntityReadPermission } from '../permissions';
+import { policyEntityReadPermission } from '../permissions';
 import { PolicyBuilder } from './policy-builder';
 
 jest.mock('@backstage/plugin-auth-node', () => ({
@@ -130,7 +130,7 @@ describe('PolicyBuilder', () => {
       const result = await request(app).get('/').send();
 
       expect(mockedAuthorizeConditional).toHaveBeenCalledWith(
-        [{ permission: permissionEntityReadPermission }],
+        [{ permission: policyEntityReadPermission }],
         { token: 'token' },
       );
       expect(result.status).toBe(403);
