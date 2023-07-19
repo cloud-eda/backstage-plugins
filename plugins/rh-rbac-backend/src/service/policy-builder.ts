@@ -1,4 +1,7 @@
-import { PluginEndpointDiscovery } from '@backstage/backend-common';
+import {
+  PluginDatabaseManager,
+  PluginEndpointDiscovery,
+} from '@backstage/backend-common';
 import { Config } from '@backstage/config';
 import {
   getBearerTokenFromAuthorizationHeader,
@@ -22,7 +25,7 @@ import {
   policyEntityReadPermission,
   RESOURCE_TYPE_POLICY_ENTITY,
 } from '../permissions';
-import { AdapterFactory } from './casbin-adapter-factory';
+import { CasbinAdapterFactory } from './casbin-adapter-factory';
 import { RBACPermissionPolicy } from './permission-policy';
 
 export class PolicyBuilder {
@@ -32,10 +35,13 @@ export class PolicyBuilder {
     discovery: PluginEndpointDiscovery;
     identity: IdentityApi;
     permissions: PermissionEvaluator;
-    adapterFactory: AdapterFactory;
+    database: PluginDatabaseManager;
   }): Promise<Router> {
     const permissions = env.permissions;
-    const adapter = await env.adapterFactory.createAdapter();
+    const adapter = await new CasbinAdapterFactory(
+      env.config,
+      env.database,
+    ).createAdapter();
 
     const options: RouterOptions = {
       config: env.config,

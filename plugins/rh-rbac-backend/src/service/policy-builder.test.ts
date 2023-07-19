@@ -46,54 +46,19 @@ describe('PolicyBuilder', () => {
     })),
   };
 
-  const mockAdapter = {
-    loadPolicy: jest
-      .fn()
-      .mockImplementation(async (_model: Model): Promise<void> => {}),
-    savePolicy: jest
-      .fn()
-      .mockImplementation(async (_model: Model): Promise<boolean> => {
-        return true;
-      }),
-    addPolicy: jest
-      .fn()
-      .mockImplementation(
-        async (
-          _sec: string,
-          _ptype: string,
-          _rule: string[],
-        ): Promise<void> => {},
-      ),
-    removePolicy: jest
-      .fn()
-      .mockImplementation(
-        async (
-          _sec: string,
-          _ptype: string,
-          _rule: string[],
-        ): Promise<void> => {},
-      ),
-    removeFilteredPolicy: jest
-      .fn()
-      .mockImplementation(
-        async (
-          _sec: string,
-          _ptype: string,
-          _fieldIndex: number,
-          ..._fieldValues: string[]
-        ) => {},
-      ),
-  };
-
-  const mockAdapterFactory = {
-    createAdapter: jest.fn().mockImplementation(async (): Promise<Adapter> => {
-      return mockAdapter;
-    }),
+  const mockDatabaseManager = {
+    getClient: jest.fn().mockImplementation(),
   };
 
   beforeEach(async () => {
     const router = await PolicyBuilder.build({
       config: new ConfigReader({
+        backend: {
+          database: {
+            client: 'better-sqlite3',
+            connection: ':memory:',
+          },
+        },
         permission: {
           enabled: true,
         },
@@ -105,7 +70,7 @@ describe('PolicyBuilder', () => {
       },
       identity: mockIdentityClient,
       permissions: mockPermissionEvaluator,
-      adapterFactory: mockAdapterFactory,
+      database: mockDatabaseManager,
     });
     app = express().use(router);
     jest.clearAllMocks();
