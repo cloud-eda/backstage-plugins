@@ -22695,10 +22695,10 @@ typedarray@^0.0.6:
   resolved "https://registry.npmjs.org/typedarray/-/typedarray-0.0.6.tgz"
   integrity sha512-/aCDEGatGvZ2BIk+HmLf4ifCJFwvKFNb9/JeZPMulfgFracn9QFcAf5GO8B/mweUjSoblS5In0cWhqpfs/5PQA==
 
-typeorm-adapter@^1.5.3:
-  version "1.5.3"
-  resolved "https://registry.npmjs.org/typeorm-adapter/-/typeorm-adapter-1.5.3.tgz"
-  integrity sha512-ZlddlBNgBuMdfJdmUoeByXGw1FWG5+f+HbCvy4/o+yaK4bmcer2MM6EieJH2ghWk4xWpJjAZEYZekhfy0ErT7w==
+typeorm-adapter@^1.5.4:
+  version "1.5.4"
+  resolved "https://registry.yarnpkg.com/typeorm-adapter/-/typeorm-adapter-1.5.4.tgz#b08a314f671e23dcc7a3a0b0623bbf4de4273a1d"
+  integrity sha512-PbvMyOnt/xMRg73PBrdgA8fEYJNkWPv40c8VBncIl/GNKXTE6NOisKfuUrpEj/nYD5E8K3YqjqVKO+Z0RAGokA==
   dependencies:
     casbin "^5.11.5"
     reflect-metadata "^0.1.13"
