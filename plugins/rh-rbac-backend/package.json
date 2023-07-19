@@ -41,7 +41,11 @@
   },
   "devDependencies": {
     "@backstage/cli": "^0.22.6",
+    "sinon": "^15.2.0",
+    "@types/sinon": "^10.0.15",
     "@types/supertest": "2.0.12",
+    "knex": "^2.5.1",
+    "knex-mock-client": "^2.0.0",
     "msw": "^1.0.0",
     "supertest": "^6.2.4"
   },

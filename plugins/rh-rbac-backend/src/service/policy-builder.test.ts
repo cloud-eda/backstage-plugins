@@ -3,7 +3,6 @@ import { getVoidLogger } from '@backstage/backend-common';
 import { ConfigReader } from '@backstage/config';
 import { AuthorizeResult } from '@backstage/plugin-permission-common';
 
-import { Adapter, Model } from 'casbin';
 import express from 'express';
 import request from 'supertest';
 
