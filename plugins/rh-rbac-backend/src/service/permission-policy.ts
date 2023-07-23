@@ -14,36 +14,35 @@ import {
   PolicyQuery,
 } from '@backstage/plugin-permission-node';
 
-import {
-  Adapter,
-  Enforcer,
-  newEnforcer,
-  newModelFromString,
-  StringAdapter,
-} from 'casbin';
+import { Enforcer, StringAdapter } from 'casbin';
 import { Logger } from 'winston';
-
-const MODEL = `
-[request_definition]
-r = sub, obj, act
-
-[policy_definition]
-p = sub, obj, act, eft
-
-[policy_effect]
-e = some(where (p.eft == allow)) && !some(where (p.eft == deny))
-
-[matchers]
-m = r.sub == p.sub && r.obj == p.obj && r.act == p.act
-`;
 
 const useAdmins = (admins: Config[], enf: Enforcer, log: Logger) => {
   admins.flatMap(async localConfig => {
     const name = localConfig.getString('name');
     const adminReadPermission = [name, 'policy-entity', 'read', 'allow'];
-    await enf.addPolicy(...adminReadPermission);
+
+    if (!(await enf.hasPolicy(...adminReadPermission))) {
+      await enf.addPolicy(...adminReadPermission);
+    }
+
     const adminCreatePermission = [name, 'policy-entity', 'create', 'allow'];
-    await enf.addPolicy(...adminCreatePermission);
+
+    if (!(await enf.hasPolicy(...adminCreatePermission))) {
+      await enf.addPolicy(...adminCreatePermission);
+    }
+
+    const adminDeletePermission = [name, 'policy-entity', 'delete', 'allow'];
+
+    if (!(await enf.hasPolicy(...adminDeletePermission))) {
+      await enf.addPolicy(...adminDeletePermission);
+    }
+
+    const adminUpdatePermission = [name, 'policy-entity', 'update', 'allow'];
+
+    if (!(await enf.hasPolicy(...adminUpdatePermission))) {
+      await enf.addPolicy(...adminUpdatePermission);
+    }
 
     // Our unit tests uses StringAdapter, but it doesn't support save policies.
     if (!(enf.getAdapter() instanceof StringAdapter)) {
@@ -63,15 +62,12 @@ export class RBACPermissionPolicy implements PermissionPolicy {
 
   public static async build(
     logger: Logger,
-    policyAdapter: Adapter,
     configApi: ConfigApi,
+    enf: Enforcer,
   ) {
-    const theModel = newModelFromString(MODEL);
-
     const adminUsers = configApi.getOptionalConfigArray(
       'permission.rbac.admin.users',
     );
-    const enf = await newEnforcer(theModel, policyAdapter);
 
     if (adminUsers) {
       useAdmins(adminUsers, enf, logger);
