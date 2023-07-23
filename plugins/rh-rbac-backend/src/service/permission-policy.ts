@@ -44,16 +44,6 @@ const useAdmins = (admins: Config[], enf: Enforcer, log: Logger) => {
     await enf.addPolicy(...adminReadPermission);
     const adminCreatePermission = [name, 'policy-entity', 'create', 'allow'];
     await enf.addPolicy(...adminCreatePermission);
-
-    // Our unit tests uses StringAdapter, but it doesn't support save policies.
-    if (!(enf.getAdapter() instanceof StringAdapter)) {
-      const ok = await enf.savePolicy();
-      if (!ok) {
-        log.error(
-          `Unable to save admin record for user ${name} to the permission storage.`,
-        );
-      }
-    }
   });
 };
 
@@ -72,6 +62,8 @@ export class RBACPermissionPolicy implements PermissionPolicy {
       'permission.rbac.admin.users',
     );
     const enf = await newEnforcer(theModel, policyAdapter);
+    await enf.loadPolicy();
+    await enf.enableAutoSave(true);
 
     if (adminUsers) {
       useAdmins(adminUsers, enf, logger);
