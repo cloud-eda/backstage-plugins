@@ -9,8 +9,8 @@ import { PolicyQuery } from '@backstage/plugin-permission-node';
 
 import { newEnforcer, newModelFromString, StringAdapter } from 'casbin';
 
+import { MODEL } from './permission-model';
 import { RBACPermissionPolicy } from './permission-policy';
-import { MODEL } from './policy-builder';
 
 describe('RBACPermissionPolicy Tests', () => {
   it('should build', async () => {
