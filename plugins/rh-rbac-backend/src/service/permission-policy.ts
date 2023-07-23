@@ -14,7 +14,7 @@ import {
   PolicyQuery,
 } from '@backstage/plugin-permission-node';
 
-import { Enforcer, StringAdapter } from 'casbin';
+import { Enforcer } from 'casbin';
 import { Logger } from 'winston';
 
 const useAdmins = (admins: Config[], enf: Enforcer, log: Logger) => {
@@ -26,33 +26,23 @@ const useAdmins = (admins: Config[], enf: Enforcer, log: Logger) => {
       await enf.addPolicy(...adminReadPermission);
     }
 
-    const adminCreatePermission = [name, 'policy-entity', 'create', 'allow'];
+    // const adminCreatePermission = [name, 'policy-entity', 'create', 'allow'];
 
-    if (!(await enf.hasPolicy(...adminCreatePermission))) {
-      await enf.addPolicy(...adminCreatePermission);
-    }
+    // if (!(await enf.hasPolicy(...adminCreatePermission))) {
+    //   await enf.addPolicy(...adminCreatePermission);
+    // }
 
-    const adminDeletePermission = [name, 'policy-entity', 'delete', 'allow'];
+    // const adminDeletePermission = [name, 'policy-entity', 'delete', 'allow'];
 
-    if (!(await enf.hasPolicy(...adminDeletePermission))) {
-      await enf.addPolicy(...adminDeletePermission);
-    }
+    // if (!(await enf.hasPolicy(...adminDeletePermission))) {
+    //   await enf.addPolicy(...adminDeletePermission);
+    // }
 
-    const adminUpdatePermission = [name, 'policy-entity', 'update', 'allow'];
+    // const adminUpdatePermission = [name, 'policy-entity', 'update', 'allow'];
 
-    if (!(await enf.hasPolicy(...adminUpdatePermission))) {
-      await enf.addPolicy(...adminUpdatePermission);
-    }
-
-    // Our unit tests uses StringAdapter, but it doesn't support save policies.
-    if (!(enf.getAdapter() instanceof StringAdapter)) {
-      const ok = await enf.savePolicy();
-      if (!ok) {
-        log.error(
-          `Unable to save admin record for user ${name} to the permission storage.`,
-        );
-      }
-    }
+    // if (!(await enf.hasPolicy(...adminUpdatePermission))) {
+    //   await enf.addPolicy(...adminUpdatePermission);
+    // }
   });
 };
 
