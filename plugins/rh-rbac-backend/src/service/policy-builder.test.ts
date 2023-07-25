@@ -283,21 +283,12 @@ describe('PolicyBuilder', () => {
 
   describe('GET /policies', () => {
     it('should be returned list all policies', async () => {
-      mockEnforcer.getPolicy = jest
-        .fn()
-        .mockImplementation(
-          async (_fieldIndex: number, ..._fieldValues: string[]) => {
-            return [
-              [
-                'user:default/permission_admin',
-                'policy-entity',
-                'create',
-                'allow',
-              ],
-              ['user:default/guest', 'policy-entity', 'read', 'allow'],
-            ];
-          },
-        );
+      mockEnforcer.getPolicy = jest.fn().mockImplementation(async () => {
+        return [
+          ['user:default/permission_admin', 'policy-entity', 'create', 'allow'],
+          ['user:default/guest', 'policy-entity', 'read', 'allow'],
+        ];
+      });
       const result = await request(app).get('/policies').send();
       expect(result.statusCode).toBe(200);
       expect(result.body).toEqual([
@@ -307,6 +298,29 @@ describe('PolicyBuilder', () => {
           policy: 'create',
           effect: 'allow',
         },
+        {
+          entityReference: 'user:default/guest',
+          permission: 'policy-entity',
+          policy: 'read',
+          effect: 'allow',
+        },
+      ]);
+    });
+    it('should be returned list filtered policies', async () => {
+      mockEnforcer.getFilteredPolicy = jest
+        .fn()
+        .mockImplementation(
+          async (_fieldIndex: number, ..._fieldValues: string[]) => {
+            return [['user:default/guest', 'policy-entity', 'read', 'allow']];
+          },
+        );
+      const result = await request(app)
+        .get(
+          '/policies?entityRef=user:default/guest&permission=policy-entity&policy=read&effect=allow',
+        )
+        .send();
+      expect(result.statusCode).toBe(200);
+      expect(result.body).toEqual([
         {
           entityReference: 'user:default/guest',
           permission: 'policy-entity',
@@ -336,7 +350,6 @@ describe('PolicyBuilder', () => {
         .send();
 
       expect(result.statusCode).toEqual(400);
-      console.log(`===${result.body}`);
       expect(result.body.error).toEqual({
         name: 'InputError',
         message: `Invalid policy definition. Cause: specify \"permission\" query param.`,
@@ -351,7 +364,6 @@ describe('PolicyBuilder', () => {
         .send();
 
       expect(result.statusCode).toEqual(400);
-      console.log(`===${result.body}`);
       expect(result.body.error).toEqual({
         name: 'InputError',
         message: `Invalid policy definition. Cause: specify \"policy\" query param.`,
@@ -639,7 +651,6 @@ describe('PolicyBuilder', () => {
       mockEnforcer.hasPolicy = jest
         .fn()
         .mockImplementation(async (...param: string[]): Promise<boolean> => {
-          console.log(param[2]);
           if (param[2] === 'write') {
             return false;
           }
@@ -677,7 +688,6 @@ describe('PolicyBuilder', () => {
       mockEnforcer.hasPolicy = jest
         .fn()
         .mockImplementation(async (...param: string[]): Promise<boolean> => {
-          console.log(param[2]);
           if (param[2] === 'write') {
             return false;
           }
@@ -720,7 +730,6 @@ describe('PolicyBuilder', () => {
       mockEnforcer.hasPolicy = jest
         .fn()
         .mockImplementation(async (...param: string[]): Promise<boolean> => {
-          console.log(param[2]);
           if (param[2] === 'write') {
             return false;
           }
