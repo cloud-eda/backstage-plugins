@@ -156,7 +156,7 @@ export class PolicyBuilder {
 
       const entityRef = getEntityReference(request);
       const policy = await enforcer.getFilteredPolicy(0, entityRef);
-      if (!(policy.length === 0)) {
+      if (policy.length !== 0) {
         response.json(transformPolicyArray(...policy));
       } else {
         throw new NotFoundError(); // 404
@@ -338,11 +338,23 @@ function validatePolicy(policy: EntityReferencedPolicy): Error | undefined {
   }
 
   if (!policy.effect) {
-    // todo check if effect should be 'allow' or 'deny'
     return new Error(`'effect' field must not be empty`);
+  } else if (!isValidEffectValue(policy.effect)) {
+    return new Error(
+      `'effect' has invalid value: '${
+        policy.effect
+      }'. It should be: '${AuthorizeResult.ALLOW.toLocaleLowerCase()}' or '${AuthorizeResult.DENY.toLocaleLowerCase()}`,
+    );
   }
 
   return undefined;
+}
+
+function isValidEffectValue(effect: string): boolean {
+  return (
+    effect === AuthorizeResult.ALLOW.toLocaleLowerCase() ||
+    effect === AuthorizeResult.DENY.toLocaleLowerCase()
+  );
 }
 
 function validateEntityReference(entityRef?: string): Error | undefined {

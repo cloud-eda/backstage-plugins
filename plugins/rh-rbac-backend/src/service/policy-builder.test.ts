@@ -6,7 +6,12 @@ import { Enforcer } from 'casbin';
 import express from 'express';
 import request from 'supertest';
 
-import { policyEntityReadPermission } from '@janus-idp/plugin-rh-rbac-common';
+import {
+  policyEntityCreatePermission,
+  policyEntityDeletePermission,
+  policyEntityReadPermission,
+  policyEntityUpdatePermission,
+} from '@janus-idp/plugin-rh-rbac-common';
 
 import { PolicyBuilder } from './policy-builder';
 
@@ -42,8 +47,8 @@ jest.mock('casbin', () => {
   const actualCasbin = jest.requireActual('casbin');
   return {
     ...actualCasbin,
-    newEnforcer: jest.fn((): Promise<Enforcer> => {
-      return Promise.resolve(mockEnforcer as Enforcer);
+    newEnforcer: jest.fn((): Promise<Partial<Enforcer>> => {
+      return Promise.resolve(mockEnforcer);
     }),
   };
 });
@@ -132,9 +137,24 @@ describe('PolicyBuilder', () => {
     });
   });
 
-  // todo: handle not authorized...
-
   describe('POST /policy', () => {
+    it('should return a status of Unauthorized', async () => {
+      mockedAuthorizeConditional.mockImplementationOnce(async () => [
+        { result: AuthorizeResult.DENY },
+      ]);
+      const result = await request(app).post('/policy').send();
+
+      expect(mockedAuthorizeConditional).toHaveBeenCalledWith(
+        [{ permission: policyEntityCreatePermission }],
+        { token: 'token' },
+      );
+      expect(result.statusCode).toBe(403);
+      expect(result.body.error).toEqual({
+        name: 'NotAllowedError',
+        message: '',
+      });
+    });
+
     it('should not be created permission policy - req body is an empty', async () => {
       const result = await request(app).post('/policy').send();
 
@@ -153,7 +173,7 @@ describe('PolicyBuilder', () => {
       expect(result.statusCode).toBe(400);
       expect(result.body.error).toEqual({
         name: 'InputError',
-        message: `Invalid policy definition. Cause: Entity reference \"user\" had missing or empty kind (e.g. did not start with \"component:\" or similar)`,
+        message: `Invalid policy definition. Cause: Entity reference "user" had missing or empty kind (e.g. did not start with "component:" or similar)`,
       });
     });
 
@@ -243,6 +263,25 @@ describe('PolicyBuilder', () => {
   });
 
   describe('GET /policy/:namespace/:id', () => {
+    it('should return a status of Unauthorized', async () => {
+      mockedAuthorizeConditional.mockImplementationOnce(async () => [
+        { result: AuthorizeResult.DENY },
+      ]);
+      const result = await request(app)
+        .get('/policy/user:default/permission_admin')
+        .send();
+
+      expect(mockedAuthorizeConditional).toHaveBeenCalledWith(
+        [{ permission: policyEntityReadPermission }],
+        { token: 'token' },
+      );
+      expect(result.statusCode).toBe(403);
+      expect(result.body.error).toEqual({
+        name: 'NotAllowedError',
+        message: '',
+      });
+    });
+
     it('should be returned permission policies by user reference', async () => {
       const result = await request(app)
         .get('/policy/user:default/permission_admin')
@@ -282,6 +321,23 @@ describe('PolicyBuilder', () => {
   });
 
   describe('GET /policies', () => {
+    it('should return a status of Unauthorized', async () => {
+      mockedAuthorizeConditional.mockImplementationOnce(async () => [
+        { result: AuthorizeResult.DENY },
+      ]);
+      const result = await request(app).get('/policies').send();
+
+      expect(mockedAuthorizeConditional).toHaveBeenCalledWith(
+        [{ permission: policyEntityReadPermission }],
+        { token: 'token' },
+      );
+      expect(result.statusCode).toBe(403);
+      expect(result.body.error).toEqual({
+        name: 'NotAllowedError',
+        message: '',
+      });
+    });
+
     it('should be returned list all policies', async () => {
       mockEnforcer.getPolicy = jest.fn().mockImplementation(async () => {
         return [
@@ -332,6 +388,24 @@ describe('PolicyBuilder', () => {
   });
 
   describe('DELETE /policy/:namespace/:id', () => {
+    it('should return a status of Unauthorized', async () => {
+      mockedAuthorizeConditional.mockImplementationOnce(async () => [
+        { result: AuthorizeResult.DENY },
+      ]);
+      const result = await request(app)
+        .delete('/policy/user-default/permission_admin')
+        .send();
+
+      expect(mockedAuthorizeConditional).toHaveBeenCalledWith(
+        [{ permission: policyEntityDeletePermission }],
+        { token: 'token' },
+      );
+      expect(result.statusCode).toBe(403);
+      expect(result.body.error).toEqual({
+        name: 'NotAllowedError',
+        message: '',
+      });
+    });
     it('should fail to delete, because entity reference is invalid', async () => {
       const result = await request(app)
         .delete('/policy/user-default/permission_admin')
@@ -340,7 +414,7 @@ describe('PolicyBuilder', () => {
       expect(result.statusCode).toEqual(400);
       expect(result.body.error).toEqual({
         name: 'InputError',
-        message: `Invalid url: Entity reference \"user-default/permission_admin\" had missing or empty kind (e.g. did not start with \"component:\" or similar)`,
+        message: `Invalid url: Entity reference "user-default/permission_admin" had missing or empty kind (e.g. did not start with "component:" or similar)`,
       });
     });
 
@@ -352,7 +426,7 @@ describe('PolicyBuilder', () => {
       expect(result.statusCode).toEqual(400);
       expect(result.body.error).toEqual({
         name: 'InputError',
-        message: `Invalid policy definition. Cause: specify \"permission\" query param.`,
+        message: `Invalid policy definition. Cause: specify "permission" query param.`,
       });
     });
 
@@ -366,7 +440,7 @@ describe('PolicyBuilder', () => {
       expect(result.statusCode).toEqual(400);
       expect(result.body.error).toEqual({
         name: 'InputError',
-        message: `Invalid policy definition. Cause: specify \"policy\" query param.`,
+        message: `Invalid policy definition. Cause: specify "policy" query param.`,
       });
     });
 
@@ -380,7 +454,7 @@ describe('PolicyBuilder', () => {
       expect(result.statusCode).toEqual(400);
       expect(result.body.error).toEqual({
         name: 'InputError',
-        message: `Invalid policy definition. Cause: specify \"effect\" query param.`,
+        message: `Invalid policy definition. Cause: specify "effect" query param.`,
       });
     });
 
@@ -452,9 +526,28 @@ describe('PolicyBuilder', () => {
   });
 
   describe('PUT /policy/:namespace/:id', () => {
+    it('should return a status of Unauthorized', async () => {
+      mockedAuthorizeConditional.mockImplementationOnce(async () => [
+        { result: AuthorizeResult.DENY },
+      ]);
+      const result = await request(app)
+        .put('/policy/user-default/permission_admin')
+        .send();
+
+      expect(mockedAuthorizeConditional).toHaveBeenCalledWith(
+        [{ permission: policyEntityUpdatePermission }],
+        { token: 'token' },
+      );
+      expect(result.statusCode).toBe(403);
+      expect(result.body.error).toEqual({
+        name: 'NotAllowedError',
+        message: '',
+      });
+    });
+
     it('should fail to update policy - old policy is absent', async () => {
       const result = await request(app)
-        .put('/policy/user:default/permission_admin?')
+        .put('/policy/user:default/permission_admin')
         .send();
 
       expect(result.statusCode).toEqual(400);
@@ -466,7 +559,7 @@ describe('PolicyBuilder', () => {
 
     it('should fail to update policy - new policy is absent', async () => {
       const result = await request(app)
-        .put('/policy/user:default/permission_admin?')
+        .put('/policy/user:default/permission_admin')
         .send({ oldPolicy: {} });
 
       expect(result.statusCode).toEqual(400);
@@ -478,7 +571,7 @@ describe('PolicyBuilder', () => {
 
     it('should fail to update policy - oldPolicy permission is absent', async () => {
       const result = await request(app)
-        .put('/policy/user:default/permission_admin?')
+        .put('/policy/user:default/permission_admin')
         .send({ oldPolicy: {}, newPolicy: {} });
 
       expect(result.statusCode).toEqual(400);
@@ -490,7 +583,7 @@ describe('PolicyBuilder', () => {
 
     it('should fail to update policy - oldPolicy policy is absent', async () => {
       const result = await request(app)
-        .put('/policy/user:default/permission_admin?')
+        .put('/policy/user:default/permission_admin')
         .send({ oldPolicy: { permission: 'policy-entity' }, newPolicy: {} });
 
       expect(result.statusCode).toEqual(400);
@@ -502,7 +595,7 @@ describe('PolicyBuilder', () => {
 
     it('should fail to update policy - oldPolicy effect is absent', async () => {
       const result = await request(app)
-        .put('/policy/user:default/permission_admin?')
+        .put('/policy/user:default/permission_admin')
         .send({
           oldPolicy: { permission: 'policy-entity', policy: 'read' },
           newPolicy: {},
@@ -517,7 +610,7 @@ describe('PolicyBuilder', () => {
 
     it('should fail to update policy - newPolicy permission is absent', async () => {
       const result = await request(app)
-        .put('/policy/user:default/permission_admin?')
+        .put('/policy/user:default/permission_admin')
         .send({
           oldPolicy: {
             permission: 'policy-entity',
@@ -536,7 +629,7 @@ describe('PolicyBuilder', () => {
 
     it('should fail to update policy - newPolicy policy is absent', async () => {
       const result = await request(app)
-        .put('/policy/user:default/permission_admin?')
+        .put('/policy/user:default/permission_admin')
         .send({
           oldPolicy: {
             permission: 'policy-entity',
@@ -555,7 +648,7 @@ describe('PolicyBuilder', () => {
 
     it('should fail to update policy - newPolicy effect is absent', async () => {
       const result = await request(app)
-        .put('/policy/user:default/permission_admin?')
+        .put('/policy/user:default/permission_admin')
         .send({
           oldPolicy: {
             permission: 'policy-entity',
@@ -572,9 +665,28 @@ describe('PolicyBuilder', () => {
       });
     });
 
+    it('should fail to update policy - newPolicy effect has invalid value', async () => {
+      const result = await request(app)
+        .put('/policy/user:default/permission_admin')
+        .send({
+          oldPolicy: {
+            permission: 'policy-entity',
+            policy: 'read',
+            effect: 'unknown',
+          },
+          newPolicy: { permission: 'policy-entity', policy: 'write' },
+        });
+
+      expect(result.statusCode).toEqual(400);
+      expect(result.body.error).toEqual({
+        name: 'InputError',
+        message: `Invalid old policy object. Cause: 'effect' has invalid value: 'unknown'. It should be: '${AuthorizeResult.ALLOW.toLocaleLowerCase()}' or '${AuthorizeResult.DENY.toLocaleLowerCase()}`,
+      });
+    });
+
     it('should fail to update policy - old policy not found', async () => {
       const result = await request(app)
-        .put('/policy/user:default/permission_admin?')
+        .put('/policy/user:default/permission_admin')
         .send({
           oldPolicy: {
             permission: 'policy-entity',
@@ -602,7 +714,7 @@ describe('PolicyBuilder', () => {
           return true;
         });
       const result = await request(app)
-        .put('/policy/user:default/permission_admin?')
+        .put('/policy/user:default/permission_admin')
         .send({
           oldPolicy: {
             permission: 'policy-entity',
@@ -630,7 +742,7 @@ describe('PolicyBuilder', () => {
           return true;
         });
       const result = await request(app)
-        .put('/policy/user:default/permission_admin?')
+        .put('/policy/user:default/permission_admin')
         .send({
           oldPolicy: {
             permission: 'policy-entity',
@@ -663,7 +775,7 @@ describe('PolicyBuilder', () => {
         });
 
       const result = await request(app)
-        .put('/policy/user:default/permission_admin?')
+        .put('/policy/user:default/permission_admin')
         .send({
           oldPolicy: {
             permission: 'policy-entity',
@@ -705,7 +817,7 @@ describe('PolicyBuilder', () => {
         });
 
       const result = await request(app)
-        .put('/policy/user:default/permission_admin?')
+        .put('/policy/user:default/permission_admin')
         .send({
           oldPolicy: {
             permission: 'policy-entity',
@@ -747,7 +859,7 @@ describe('PolicyBuilder', () => {
         });
 
       const result = await request(app)
-        .put('/policy/user:default/permission_admin?')
+        .put('/policy/user:default/permission_admin')
         .send({
           oldPolicy: {
             permission: 'policy-entity',
