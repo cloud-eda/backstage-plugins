@@ -873,7 +873,7 @@ describe('PolicyBuilder', () => {
           },
         });
 
-      expect(result.statusCode).toEqual(201);
+      expect(result.statusCode).toEqual(200);
     });
   });
 });

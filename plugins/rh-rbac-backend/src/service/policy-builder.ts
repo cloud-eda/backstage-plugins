@@ -295,7 +295,7 @@ export class PolicyBuilder {
         throw new ServiceUnavailableError(); // 500
       }
 
-      resp.status(201).end();
+      resp.status(200).end();
     });
 
     return router;
