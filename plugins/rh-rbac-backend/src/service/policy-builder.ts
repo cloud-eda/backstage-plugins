@@ -1,12 +1,14 @@
 import {
   PluginEndpointDiscovery,
   resolvePackagePath,
+  UrlReaders,
 } from '@backstage/backend-common';
 import { parseEntityRef } from '@backstage/catalog-model';
 import { Config } from '@backstage/config';
 import {
   ConflictError,
   InputError,
+  isError,
   NotAllowedError,
   NotFoundError,
   ServiceUnavailableError,
@@ -21,6 +23,8 @@ import {
 } from '@backstage/plugin-permission-backend';
 import {
   AuthorizeResult,
+  isResourcePermission,
+  Permission,
   PermissionEvaluator,
   QueryPermissionRequest,
 } from '@backstage/plugin-permission-common';
@@ -35,6 +39,8 @@ import { Logger } from 'winston';
 
 import {
   EntityReferencedPolicy,
+  pluginPolicyEntityReadPermission,
+  Policy,
   policyEntityCreatePermission,
   policyEntityDeletePermission,
   policyEntityPermissions,
@@ -45,6 +51,10 @@ import {
 
 import { MODEL } from './permission-model';
 import { RBACPermissionPolicy } from './permission-policy';
+import {
+  PluginEndpointCollector,
+  PluginEndpointProvider,
+} from './plugin-endpoints';
 
 export class PolicyBuilder {
   public static async build(env: {
@@ -53,6 +63,8 @@ export class PolicyBuilder {
     discovery: PluginEndpointDiscovery;
     identity: IdentityApi;
     permissions: PermissionEvaluator;
+    urlReader: UrlReaders;
+    pluginEndpointProvider: PluginEndpointProvider;
   }): Promise<Router> {
     // TODO: Replace with a DB adapter.
     const adapter = new FileAdapter(
@@ -66,6 +78,16 @@ export class PolicyBuilder {
 
     const theModel = newModelFromString(MODEL);
     const enforcer = await newEnforcer(theModel, adapter);
+
+    const urlReader = UrlReaders.default({
+      config: env.config,
+      logger: env.logger,
+      factories: [PluginEndpointCollector.permissionFactory],
+    });
+    const baseUrl = (await env.discovery.getBaseUrl('permission')).replace(
+      '/permission',
+      '',
+    );
 
     const authorize = async (
       identity: IdentityApi,
@@ -118,6 +140,35 @@ export class PolicyBuilder {
         throw new NotAllowedError(); // 403
       }
       response.send({ status: 'Authorized' });
+    });
+
+    router.get('/plugins/policies', async (req, response) => {
+      const decision = await authorize(env.identity, req, permissions, {
+        permission: pluginPolicyEntityReadPermission,
+      });
+
+      if (decision.result === AuthorizeResult.DENY) {
+        throw new NotAllowedError(); // 403
+      }
+      const endpoints = env.pluginEndpointProvider.get();
+      let perms: Permission[] = [];
+      for (const endpoint of endpoints) {
+        const wellKnownURL = `${baseUrl}${endpoint}/.well-known/backstage/permissions/metadata`;
+        try {
+          const permResp = await urlReader.readUrl(wellKnownURL);
+          const permMetaDataRaw = (await permResp.buffer()).toString();
+          const permMetaData = JSON.parse(permMetaDataRaw);
+          if (permMetaData) {
+            perms = [...perms, ...permMetaData.permissions];
+          }
+        } catch (err) {
+          if (!isError(err) || err.name !== 'NotFoundError') {
+            throw err;
+          }
+        }
+      }
+
+      response.json(permissionsToCasbinPolicies(perms)).send(200);
     });
 
     router.get('/policies', async (req, response) => {
@@ -414,4 +465,17 @@ function isPolicyFilterEnabled(req: Request): boolean {
     !!req.query.policy ||
     !!req.query.effect
   );
+}
+
+function permissionsToCasbinPolicies(permissions: Permission[]): Policy[] {
+  return permissions.map(permission => {
+    const policy: Policy = {
+      permission: isResourcePermission(permission)
+        ? permission.resourceType
+        : permission.name,
+      // maybe we can apply policy validation with values: 'create' | 'read' | 'update' | 'delete' | 'use'
+      policy: permission.attributes.action || 'use',
+    };
+    return policy;
+  });
 }

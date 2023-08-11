@@ -43,6 +43,17 @@ const useAdmins = (admins: Config[], enf: Enforcer) => {
     if (!(await enf.hasPolicy(...adminUpdatePermission))) {
       await enf.addPolicy(...adminUpdatePermission);
     }
+
+    const adminReadPluginPermission = [
+      name,
+      'plugin-policy-entity',
+      'read',
+      'allow',
+    ];
+
+    if (!(await enf.hasPolicy(...adminReadPluginPermission))) {
+      await enf.addPolicy(...adminReadPluginPermission);
+    }
   });
 };
 
