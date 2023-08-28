@@ -3,7 +3,16 @@ import { Navigate, Route } from 'react-router';
 
 import { createApp } from '@backstage/app-defaults';
 import { FlatRoutes } from '@backstage/core-app-api';
-import { AlertDisplay, OAuthRequestDialog } from '@backstage/core-components';
+import {
+  AlertDisplay,
+  OAuthRequestDialog,
+  SignInPage,
+} from '@backstage/core-components';
+import {
+  bitbucketAuthApiRef,
+  githubAuthApiRef,
+  microsoftAuthApiRef,
+} from '@backstage/core-plugin-api';
 import { apiDocsPlugin, ApiExplorerPage } from '@backstage/plugin-api-docs';
 import {
   CatalogEntityPage,
@@ -36,6 +45,34 @@ import { Root } from './components/Root';
 import { searchPage } from './components/search/SearchPage';
 
 const app = createApp({
+  components: {
+    SignInPage: props => (
+      <SignInPage
+        {...props}
+        auto
+        providers={[
+          {
+            id: 'bitbucket-auth-provider',
+            title: 'Bitbucket',
+            message: 'Sign In using Bitbucket',
+            apiRef: bitbucketAuthApiRef,
+          },
+          {
+            id: 'github-auth-provider',
+            title: 'GitHub',
+            message: 'Sign in using GitHub',
+            apiRef: githubAuthApiRef,
+          },
+          {
+            id: 'microsoft-auth-provider',
+            title: 'Microsoft',
+            message: 'Sign In using Microsoft Azure AD',
+            apiRef: microsoftAuthApiRef,
+          },
+        ]}
+      />
+    ),
+  },
   apis,
   bindRoutes({ bind }) {
     bind(catalogPlugin.externalRoutes, {
