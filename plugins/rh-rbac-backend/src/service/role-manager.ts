@@ -1,9 +1,9 @@
 import { RoleManager } from 'casbin';
 
-import { GroupInfoCollector } from './group-info-catalog';
+import { GroupSearcher } from './group-searcher';
 
 export class BackstageRoleManager implements RoleManager {
-  constructor(private readonly groupInfo: GroupInfoCollector) {}
+  constructor(private readonly groupInfo: GroupSearcher) {}
 
   /**
    * clear clears all stored data and resets the role manager to the initial state.

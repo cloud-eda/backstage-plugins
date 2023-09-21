@@ -18,7 +18,7 @@ import {
 import { Enforcer, FileAdapter, newEnforcer, newModelFromString } from 'casbin';
 import { Logger } from 'winston';
 
-import { GroupInfoCollector } from './group-info-catalog';
+import { GroupSearcher } from './group-searcher';
 import { MODEL } from './permission-model';
 import { BackstageRoleManager } from './role-manager';
 
@@ -157,7 +157,7 @@ export class RBACPermissionPolicy implements PermissionPolicy {
 
     const entityRef = identity.userEntityRef;
 
-    const groupCollector = new GroupInfoCollector(this.catalogClient);
+    const groupCollector = new GroupSearcher(this.catalogClient);
 
     const rm = new BackstageRoleManager(groupCollector);
     this.enforcer.setRoleManager(rm);

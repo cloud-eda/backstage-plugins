@@ -3,7 +3,7 @@ import { Entity } from '@backstage/catalog-model';
 
 export type FilterRelations = 'relations.hasMember' | 'relations.parentOf';
 
-export class GroupInfoCollector {
+export class GroupSearcher {
   constructor(private readonly catalogClient: CatalogClient) {}
 
   async findAncestorGroup(
