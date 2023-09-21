@@ -51,13 +51,12 @@ export class BackstageRoleManager implements RoleManager {
       return true;
     }
 
-    const roles = await this.getRoles(name1);
-    for (const role of roles) {
-      if (role === name2) {
-        return true;
-      }
-    }
-    return false;
+    const role = await this.groupInfo.findAncestorGroup(
+      [name1],
+      name2,
+      'relations.hasMember',
+    );
+    return !!role;
   }
 
   /**
@@ -76,30 +75,16 @@ export class BackstageRoleManager implements RoleManager {
    * getRoles gets the roles that a subject inherits.
    * domain is a prefix to the roles.
    */
-  async getRoles(name: string, ...domain: string[]): Promise<string[]> {
-    if (domain.length > 0) {
-      throw new Error('domain argument is not supported.');
-    }
-
-    const groups = await this.groupInfo.getAncestorGroups([name]);
-    return groups.map(
-      group => `group:default/${group.metadata.name.toLocaleLowerCase()}`,
-    );
+  async getRoles(_name: string, ..._domain: string[]): Promise<string[]> {
+    throw new Error('Method "getRoles" not implemented.');
   }
 
   /**
    * getUsers gets the users that inherits a subject.
    * domain is an unreferenced parameter here, may be used in other implementations.
    */
-  async getUsers(name: string, ...domain: string[]): Promise<string[]> {
-    if (domain.length > 0) {
-      throw new Error('domain argument is not supported.');
-    }
-
-    const entities = await this.groupInfo.getGroupUsers(name);
-    return entities.map(
-      entity => `user:default/${entity.metadata.name.toLocaleLowerCase()}`,
-    );
+  async getUsers(_name: string, ..._domain: string[]): Promise<string[]> {
+    throw new Error('Method "getUsers" not implemented.');
   }
 
   /**
