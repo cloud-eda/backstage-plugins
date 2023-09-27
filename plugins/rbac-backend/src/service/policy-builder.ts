@@ -71,6 +71,9 @@ export class PolicyBuilder {
       env.permissions,
       options,
       enf,
+      env.config,
+      env.logger,
+      env.discovery,
     );
     return server.serve();
   }
