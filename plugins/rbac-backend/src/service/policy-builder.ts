@@ -89,6 +89,7 @@ export class PolicyBuilder {
     const enforcerDelegate = new EnforcerDelegate(
       enf,
       policyMetadataStorage,
+      roleMetadataStorage,
       knex,
     );
 

@@ -12,12 +12,14 @@ import {
   PermissionPolicyMetadataDao,
   PolicyMetadataStorage,
 } from '../database/policy-metadata-storage';
+import { RoleMetadataStorage } from '../database/role-metadata';
 import { policiesToString, policyToString } from '../helper';
 
 export class EnforcerDelegate {
   constructor(
     private readonly enforcer: Enforcer,
     private readonly metadataStorage: PolicyMetadataStorage,
+    private readonly roleMetadataStorage: RoleMetadataStorage,
     private readonly knex: Knex,
   ) {}
 
@@ -98,9 +100,9 @@ export class EnforcerDelegate {
     const addMetadataTrx = await this.knex.transaction();
 
     try {
-      await this.metadataStorage.createPolicyMetadata(
-        source,
-        policy,
+      await this.roleMetadataStorage.createRoleMetadata(
+        { source: source },
+        policy.at(1)!,
         addMetadataTrx,
       );
       const ok = await this.enforcer.addGroupingPolicy(...policy);
@@ -122,9 +124,9 @@ export class EnforcerDelegate {
 
     try {
       for (const policy of policies) {
-        await this.metadataStorage.createPolicyMetadata(
-          source,
-          policy,
+        await this.roleMetadataStorage.createRoleMetadata(
+          { source: source },
+          policy.at(1)!,
           addMetadataTrx,
         );
       }
@@ -191,7 +193,10 @@ export class EnforcerDelegate {
 
     try {
       await this.checkIfPolicyModifiable(policy, allowToDeleCSVFilePolicy);
-      await this.metadataStorage.removePolicyMetadata(policy, rmMetadataTrx);
+      await this.roleMetadataStorage.removeRoleMetadata(
+        policy.at(1)!,
+        rmMetadataTrx,
+      );
       const ok = await this.enforcer.removeGroupingPolicy(...policy);
       if (!ok) {
         throw new Error(`Failed to delete policy ${policyToString(policy)}`);
@@ -211,7 +216,10 @@ export class EnforcerDelegate {
     try {
       for (const policy of policies) {
         await this.checkIfPolicyModifiable(policy, allowToDeleCSVFilePolicy);
-        await this.metadataStorage.removePolicyMetadata(policy, rmMetadataTrx);
+        await this.roleMetadataStorage.removeRoleMetadata(
+          policy.at(1)!,
+          rmMetadataTrx,
+        );
       }
       const ok = await this.enforcer.removeGroupingPolicies(policies);
       if (!ok) {
@@ -279,12 +287,32 @@ export class EnforcerDelegate {
     return policiesWithoutSource;
   }
 
+  async getGroupPoliciesWithoutSource(): Promise<string[][]> {
+    const policiesWithoutSource: string[][] = [];
+    const allPolicies = await this.enforcer.getGroupingPolicy();
+    for (const policy of allPolicies) {
+      const sourcePolicy = await this.roleMetadataStorage.findRoleMetadata(
+        policy.at(1)!,
+      );
+      if (!sourcePolicy) {
+        policiesWithoutSource.push(policy);
+      }
+    }
+    return policiesWithoutSource;
+  }
+
   async migratePreexistingPolicies(enforcer: Enforcer): Promise<void> {
     const policies = await this.getPoliciesWithoutSource();
+    const groupPolicies = await this.getGroupPoliciesWithoutSource();
 
     for (const policy of policies) {
       await enforcer.removePolicy(...policy);
       await this.addPolicy(policy, 'legacy');
+    }
+
+    for (const policy of groupPolicies) {
+      await enforcer.removeGroupingPolicy(...policy);
+      await this.addGroupingPolicy(policy, 'legacy');
     }
   }
 }

@@ -18,7 +18,7 @@ import { FileAdapter, newEnforcer, newModelFromString } from 'casbin';
 import { Knex } from 'knex';
 import { Logger } from 'winston';
 
-import { RoleSource, Source } from '@janus-idp/backstage-plugin-rbac-common';
+import { Source } from '@janus-idp/backstage-plugin-rbac-common';
 
 import { ConditionalStorage } from '../database/conditional-storage';
 import { RoleMetadataStorage } from '../database/role-metadata';
@@ -26,21 +26,6 @@ import { metadataStringToPolicy } from '../helper';
 import { EnforcerDelegate } from './enforcer-delegate';
 import { MODEL } from './permission-model';
 import { validateEntityReference } from './policies-validation';
-
-async function addRoleMetadata(
-  groupPolicy: string[],
-  source: RoleSource,
-  roleMetadataStorage: RoleMetadataStorage,
-  trx: Knex.Transaction,
-) {
-  const entityRef = groupPolicy[1];
-  if (entityRef.startsWith(`role:`)) {
-    const metadata = await roleMetadataStorage.findRoleMetadata(entityRef);
-    if (!metadata) {
-      await roleMetadataStorage.createRoleMetadata({ source }, entityRef, trx);
-    }
-  }
-}
 
 const legacyPolicies = async (enf: EnforcerDelegate, policy: string[]) => {
   if (
@@ -165,16 +150,10 @@ const addPredefinedPoliciesAndGroupPolicies = async (
   }
 
   const delRoleMetaTrx = await knex.transaction();
-  try {
-    for (const roleMeta of rolesToDelete) {
-      await roleMetadataStorage.removeRoleMetadata(roleMeta, delRoleMetaTrx);
-    }
-    await enf.removeGroupingPolicies(groupPoliciesToDelete, true);
-    delRoleMetaTrx.commit();
-  } catch (err) {
-    delRoleMetaTrx.rollback();
-    throw err;
+  for (const roleMeta of rolesToDelete) {
+    await roleMetadataStorage.removeRoleMetadata(roleMeta, delRoleMetaTrx);
   }
+  await enf.removeGroupingPolicies(groupPoliciesToDelete, true);
   await enf.removePolicies(policiesToDelete, true);
 
   for (const policy of policies) {
@@ -200,20 +179,7 @@ const addPredefinedPoliciesAndGroupPolicies = async (
         roleMetadataStorage,
         `csv-file`,
       );
-      const trx = await knex.transaction();
-      try {
-        await addRoleMetadata(
-          groupPolicy,
-          'csv-file',
-          roleMetadataStorage,
-          trx,
-        );
-        await enf.addGroupingPolicy(groupPolicy, 'csv-file');
-        trx.commit();
-      } catch (err) {
-        trx.rollback();
-        throw err;
-      }
+      enf.addGroupingPolicy(groupPolicy, 'csv-file');
     }
   }
 };
