@@ -92,6 +92,8 @@ export class PolicyBuilder {
       knex,
     );
 
+    await enforcerDelegate.migratePreexistingPolicies(enf);
+
     const options: RouterOptions = {
       config: env.config,
       logger: env.logger,

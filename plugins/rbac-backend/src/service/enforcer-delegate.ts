@@ -64,9 +64,9 @@ export class EnforcerDelegate {
       if (!ok) {
         throw new Error(`failed to create policy ${policyToString(policy)}`);
       }
-      addMetadataTrx.commit();
+      await addMetadataTrx.commit();
     } catch (err) {
-      addMetadataTrx.rollback();
+      await addMetadataTrx.rollback();
       throw err;
     }
   }
@@ -87,9 +87,9 @@ export class EnforcerDelegate {
           `Failed to store policies ${policiesToString(policies)}`,
         );
       }
-      addMetadataTrx.commit();
+      await addMetadataTrx.commit();
     } catch (err) {
-      addMetadataTrx.rollback();
+      await addMetadataTrx.rollback();
       throw err;
     }
   }
@@ -107,9 +107,9 @@ export class EnforcerDelegate {
       if (!ok) {
         throw new Error(`failed to create policy ${policyToString(policy)}`);
       }
-      addMetadataTrx.commit();
+      await addMetadataTrx.commit();
     } catch (err) {
-      addMetadataTrx.rollback();
+      await addMetadataTrx.rollback();
       throw err;
     }
   }
@@ -134,9 +134,9 @@ export class EnforcerDelegate {
           `Failed to store policies ${policiesToString(policies)}`,
         );
       }
-      addMetadataTrx.commit();
+      await addMetadataTrx.commit();
     } catch (err) {
-      addMetadataTrx.rollback();
+      await addMetadataTrx.rollback();
       throw err;
     }
   }
@@ -152,9 +152,9 @@ export class EnforcerDelegate {
       if (!ok) {
         throw new Error(`fail to delete policy ${policy}`);
       }
-      rmMetadataTrx.commit();
+      await rmMetadataTrx.commit();
     } catch (err) {
-      rmMetadataTrx.rollback(err);
+      await rmMetadataTrx.rollback(err);
       throw err;
     }
   }
@@ -176,9 +176,9 @@ export class EnforcerDelegate {
           `Failed to delete policies ${policiesToString(policies)}`,
         );
       }
-      rmMetadataTrx.commit();
+      await rmMetadataTrx.commit();
     } catch (err) {
-      rmMetadataTrx.rollback(err);
+      await rmMetadataTrx.rollback(err);
       throw err;
     }
   }
@@ -196,9 +196,9 @@ export class EnforcerDelegate {
       if (!ok) {
         throw new Error(`Failed to delete policy ${policyToString(policy)}`);
       }
-      rmMetadataTrx.commit();
+      await rmMetadataTrx.commit();
     } catch (err) {
-      rmMetadataTrx.rollback(err);
+      await rmMetadataTrx.rollback(err);
       throw err;
     }
   }
@@ -219,9 +219,9 @@ export class EnforcerDelegate {
           `Failed to delete grouping policies: ${policiesToString(policies)}`,
         );
       }
-      rmMetadataTrx.commit();
+      await rmMetadataTrx.commit();
     } catch (err) {
-      rmMetadataTrx.rollback(err);
+      await rmMetadataTrx.rollback(err);
       throw err;
     }
   }
@@ -264,5 +264,27 @@ export class EnforcerDelegate {
     source: Source,
   ): Promise<PermissionPolicyMetadataDao[]> {
     return await this.metadataStorage.findPolicyMetadataBySource(source);
+  }
+
+  async getPoliciesWithoutSource(): Promise<string[][]> {
+    const policiesWithoutSource: string[][] = [];
+    const allPolicies = await this.enforcer.getPolicy();
+    for (const policy of allPolicies) {
+      const sourcePolicy =
+        await this.metadataStorage.findPolicyMetadata(policy);
+      if (!sourcePolicy) {
+        policiesWithoutSource.push(policy);
+      }
+    }
+    return policiesWithoutSource;
+  }
+
+  async migratePreexistingPolicies(enforcer: Enforcer): Promise<void> {
+    const policies = await this.getPoliciesWithoutSource();
+
+    for (const policy of policies) {
+      await enforcer.removePolicy(...policy);
+      await this.addPolicy(policy, 'legacy');
+    }
   }
 }

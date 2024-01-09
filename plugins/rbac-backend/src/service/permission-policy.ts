@@ -42,6 +42,15 @@ async function addRoleMetadata(
   }
 }
 
+const legacyPolicies = async (enf: EnforcerDelegate, policy: string[]) => {
+  if (
+    (await enf.hasPolicy(...policy)) &&
+    (await enf.getMetadata(policy)).source === 'legacy'
+  ) {
+    await enf.removePolicy(policy);
+  }
+};
+
 const useAdmins = async (
   admins: Config[],
   enf: EnforcerDelegate,
@@ -55,7 +64,7 @@ const useAdmins = async (
   if (!adminRoleMeta) {
     const trx = await knex.transaction();
     await roleMetadataStorage.createRoleMetadata(
-      { source: 'default' },
+      { source: 'configuration' },
       adminRoleName,
       trx,
     );
@@ -71,15 +80,20 @@ const useAdmins = async (
   });
 
   const adminReadPermission = [adminRoleName, 'policy-entity', 'read', 'allow'];
+
+  await legacyPolicies(enf, adminReadPermission);
   if (!(await enf.hasPolicy(...adminReadPermission))) {
     await enf.addPolicy(adminReadPermission, 'configuration');
   }
+
   const adminCreatePermission = [
     adminRoleName,
     'policy-entity',
     'create',
     'allow',
   ];
+
+  await legacyPolicies(enf, adminCreatePermission);
   if (!(await enf.hasPolicy(...adminCreatePermission))) {
     await enf.addPolicy(adminCreatePermission, 'configuration');
   }
@@ -90,6 +104,8 @@ const useAdmins = async (
     'delete',
     'allow',
   ];
+
+  await legacyPolicies(enf, adminDeletePermission);
   if (!(await enf.hasPolicy(...adminDeletePermission))) {
     await enf.addPolicy(adminDeletePermission, 'configuration');
   }
@@ -100,6 +116,8 @@ const useAdmins = async (
     'update',
     'allow',
   ];
+
+  await legacyPolicies(enf, adminUpdatePermission);
   if (!(await enf.hasPolicy(...adminUpdatePermission))) {
     await enf.addPolicy(adminUpdatePermission, 'configuration');
   }
@@ -166,6 +184,9 @@ const addPredefinedPoliciesAndGroupPolicies = async (
         `Failed to validate policy from file ${preDefinedPoliciesFile}. Cause: ${err.message}`,
       );
     }
+
+    await legacyPolicies(enf, policy);
+
     if (!(await enf.hasPolicy(...policy))) {
       await enf.addPolicy(policy, 'csv-file');
     }
