@@ -1,3 +1,17 @@
+## @janus-idp/shared-react [2.3.0](https://github.com/janus-idp/backstage-plugins/compare/@janus-idp/shared-react@2.2.0...@janus-idp/shared-react@2.3.0) (2023-12-22)
+
+
+### Features
+
+* **tekton:** add CVE summary and signed badge ([#1028](https://github.com/janus-idp/backstage-plugins/issues/1028)) ([effdef0](https://github.com/janus-idp/backstage-plugins/commit/effdef085deaeea78a819d1bde960f83820ec705))
+
+## @janus-idp/shared-react [2.2.0](https://github.com/janus-idp/backstage-plugins/compare/@janus-idp/shared-react@2.1.0...@janus-idp/shared-react@2.2.0) (2023-12-20)
+
+
+### Features
+
+* **tekton:** add view logs and view sbom actions in the pipelineRun list ([#1003](https://github.com/janus-idp/backstage-plugins/issues/1003)) ([c7eff5f](https://github.com/janus-idp/backstage-plugins/commit/c7eff5f33daef8eaba58df7e987b44f09c7a8ff9))
+
 ## @janus-idp/shared-react [2.1.0](https://github.com/janus-idp/backstage-plugins/compare/@janus-idp/shared-react@2.0.1...@janus-idp/shared-react@2.1.0) (2023-12-14)
 
 

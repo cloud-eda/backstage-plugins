@@ -6,8 +6,8 @@ import {
 } from '@backstage/plugin-permission-react';
 import { renderInTestApp } from '@backstage/test-utils';
 
-import { useRoles } from '../hooks/useRoles';
-import { RolesData } from '../types';
+import { useRoles } from '../../hooks/useRoles';
+import { RolesData } from '../../types';
 import { RolesList } from './RolesList';
 
 jest.mock('@backstage/plugin-permission-react', () => ({
@@ -15,7 +15,7 @@ jest.mock('@backstage/plugin-permission-react', () => ({
   RequirePermission: jest.fn(),
 }));
 
-jest.mock('../hooks/useRoles', () => ({
+jest.mock('../../hooks/useRoles', () => ({
   useRoles: jest.fn(),
 }));
 
@@ -63,14 +63,14 @@ describe('RolesList', () => {
     mockUseRoles.mockReturnValue({
       loading: false,
       data: useRolesMockData,
-      retry: () => {},
+      retry: jest.fn(),
       createRoleAllowed: false,
     });
     const { queryByText } = await renderInTestApp(<RolesList />);
     expect(queryByText('All roles (2)')).not.toBeNull();
     expect(queryByText('role:default/guests')).not.toBeNull();
     expect(queryByText('role:default/rbac_admin')).not.toBeNull();
-    expect(queryByText('1 User, 1 Group')).not.toBeNull();
+    expect(queryByText('1 user, 1 group')).not.toBeNull();
   });
 
   it('should show empty table when there are no roles', async () => {
@@ -79,7 +79,7 @@ describe('RolesList', () => {
     mockUseRoles.mockReturnValue({
       loading: false,
       data: [],
-      retry: () => {},
+      retry: jest.fn(),
       createRoleAllowed: false,
     });
     const { getByTestId } = await renderInTestApp(<RolesList />);
@@ -94,7 +94,7 @@ describe('RolesList', () => {
     mockUseRoles.mockReturnValue({
       loading: false,
       data: useRolesMockData,
-      retry: () => {},
+      retry: jest.fn(),
       createRoleAllowed: false,
     });
     const { getAllByTestId, getByText } = await renderInTestApp(<RolesList />);
@@ -125,7 +125,7 @@ describe('RolesList', () => {
           },
         },
       ],
-      retry: () => {},
+      retry: jest.fn(),
       createRoleAllowed: false,
     });
     const { getAllByTestId } = await renderInTestApp(<RolesList />);
@@ -156,7 +156,7 @@ describe('RolesList', () => {
           },
         },
       ],
-      retry: () => {},
+      retry: jest.fn(),
       createRoleAllowed: true,
     });
     const { getAllByTestId } = await renderInTestApp(<RolesList />);
@@ -170,7 +170,7 @@ describe('RolesList', () => {
     mockUseRoles.mockReturnValue({
       loading: false,
       data: useRolesMockData,
-      retry: () => {},
+      retry: jest.fn(),
       createRoleAllowed: false,
     });
     const { getByTestId } = await renderInTestApp(<RolesList />);
@@ -186,7 +186,7 @@ describe('RolesList', () => {
     mockUseRoles.mockReturnValue({
       loading: false,
       data: useRolesMockData,
-      retry: () => {},
+      retry: jest.fn(),
       createRoleAllowed: true,
     });
     const { getByTestId } = await renderInTestApp(<RolesList />);

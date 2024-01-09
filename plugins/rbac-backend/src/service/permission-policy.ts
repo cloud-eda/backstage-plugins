@@ -216,7 +216,7 @@ async function validateGroupingPolicy(
     );
   }
   const parent = groupPolicy[1];
-  err = validateEntityReference(parent);
+  err = validateEntityReference(parent, true);
   if (err) {
     throw new Error(
       `Failed to validate group policy ${groupPolicy} from file ${preDefinedPoliciesFile}. Cause: ${err.message}`,
