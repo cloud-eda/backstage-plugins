@@ -56,7 +56,7 @@ const useAdmins = async (
       adminRoleName,
       trx,
     );
-    trx.commit();
+    await trx.commit();
   }
 
   admins.flatMap(async localConfig => {
@@ -149,9 +149,9 @@ const addPredefinedPoliciesAndGroupPolicies = async (
       await roleMetadataStorage.removeRoleMetadata(roleMeta, delRoleMetaTrx);
     }
     await enf.removeGroupingPolicies(groupPoliciesToDelete, true);
-    delRoleMetaTrx.commit();
+    await delRoleMetaTrx.commit();
   } catch (err) {
-    delRoleMetaTrx.rollback();
+    await delRoleMetaTrx.rollback();
     throw err;
   }
   await enf.removePolicies(policiesToDelete, true);
@@ -185,9 +185,9 @@ const addPredefinedPoliciesAndGroupPolicies = async (
           trx,
         );
         await enf.addGroupingPolicy(groupPolicy, 'csv-file');
-        trx.commit();
+        await trx.commit();
       } catch (err) {
-        trx.rollback();
+        await trx.rollback();
         throw err;
       }
     }
@@ -236,7 +236,7 @@ async function validateGroupingPolicy(
   }
 
   const metadata = await roleMetadataStorage.findRoleMetadata(parent);
-  if (metadata && metadata.source !== source) {
+  if (metadata && metadata.source !== source && metadata.source !== 'legacy') {
     throw new Error(
       `You could not add user or group to the role created with source ${metadata.source}`,
     );
