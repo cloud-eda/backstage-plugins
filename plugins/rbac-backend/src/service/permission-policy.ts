@@ -18,7 +18,7 @@ import { FileAdapter, newEnforcer, newModelFromString } from 'casbin';
 import { Knex } from 'knex';
 import { Logger } from 'winston';
 
-import { RoleSource, Source } from '@janus-idp/backstage-plugin-rbac-common';
+import { Source } from '@janus-idp/backstage-plugin-rbac-common';
 
 import { ConditionalStorage } from '../database/conditional-storage';
 import { RoleMetadataStorage } from '../database/role-metadata';
@@ -29,7 +29,7 @@ import { validateEntityReference } from './policies-validation';
 
 async function addRoleMetadata(
   groupPolicy: string[],
-  source: RoleSource,
+  source: Source,
   roleMetadataStorage: RoleMetadataStorage,
   trx: Knex.Transaction,
 ) {
@@ -67,7 +67,7 @@ const useAdmins = async (
     );
     if (!adminRoleMeta) {
       await roleMetadataStorage.createRoleMetadata(
-        { source: 'default' },
+        { source: 'configuration' },
         adminRoleName,
         trx,
       );
