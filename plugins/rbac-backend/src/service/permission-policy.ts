@@ -79,7 +79,7 @@ const useAdmins = async (
       );
     }
 
-    // // todo: hmm... error: cannot to save policy, the adapter does not implement the BatchAdapter!
+    // Cannot to save policy with help of addGroupingPolicies, the adapter does not implement the BatchAdapter
     // if (rbacAdminsGroupPolicies.length > 0) {
     //   await enf.addGroupingPolicies(rbacAdminsGroupPolicies, 'configuration', trx);
     // }
