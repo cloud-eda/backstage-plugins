@@ -1242,6 +1242,35 @@ describe('RBACPermissionPolicy Tests', () => {
 
 // Notice: There is corner case, when "resourced" permission policy can be defined not by resource type, but by name.
 describe('Policy checks for resourced permissions defined by name', () => {
+  const roleMetadataStorageTest: RoleMetadataStorage = {
+    findRoleMetadata: jest
+      .fn()
+      .mockImplementation(
+        async (
+          _roleEntityRef: string,
+          _trx: Knex.Knex.Transaction,
+        ): Promise<RoleMetadata> => {
+          return { source: 'rest' };
+        },
+      ),
+    createRoleMetadata: jest.fn().mockImplementation(),
+    updateRoleMetadata: jest.fn().mockImplementation(),
+    removeRoleMetadata: jest.fn().mockImplementation(),
+  };
+  const policyMetadataStorageTest: PolicyMetadataStorage = {
+    findPolicyMetadataBySource: jest
+      .fn()
+      .mockImplementation(
+        async (_source: Source): Promise<PermissionPolicyMetadataDao[]> => {
+          return [];
+        },
+      ),
+    findPolicyMetadata: jest.fn().mockImplementation(),
+    createPolicyMetadata: jest.fn().mockImplementation(),
+    removePolicyMetadata: jest.fn().mockImplementation(),
+  };
+  let enfDelegate: EnforcerDelegate;
+
   async function createRBACPolicy(
     policyContent: string,
   ): Promise<RBACPermissionPolicy> {
@@ -1256,11 +1285,21 @@ describe('Policy checks for resourced permissions defined by name', () => {
       tokenManagerMock,
     );
 
+    const knex = Knex.knex({ client: MockClient });
+    enfDelegate = new EnforcerDelegate(
+      enf,
+      policyMetadataStorageTest,
+      roleMetadataStorageTest,
+      knex,
+    );
+
     return await RBACPermissionPolicy.build(
       logger,
       config,
       conditionalStorage,
-      enf,
+      enfDelegate,
+      roleMetadataStorageMock,
+      knex,
     );
   }
   it('should allow access to resourced permission assigned by name', async () => {
