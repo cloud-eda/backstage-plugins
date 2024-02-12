@@ -8,30 +8,12 @@ import {
 } from '@janus-idp/backstage-plugin-rbac-common';
 
 import { policyToString } from '../helper';
+import {
+  PermissionPolicyMetadataDao,
+  PolicyMetadataStorage,
+} from './meta-data-storage';
 
 export const POLICY_METADATA_TABLE = 'policy-metadata';
-
-export interface PermissionPolicyMetadataDao extends PermissionPolicyMetadata {
-  id: number;
-  policy: string;
-}
-
-export interface PolicyMetadataStorage {
-  findPolicyMetadataBySource(
-    source: string,
-    trx?: Knex.Transaction,
-  ): Promise<PermissionPolicyMetadataDao[]>;
-  findPolicyMetadata(
-    policy: string[],
-    trx?: Knex.Transaction,
-  ): Promise<PermissionPolicyMetadata | undefined>;
-  createPolicyMetadata(
-    source: Source,
-    policy: string[],
-    trx: Knex.Transaction,
-  ): Promise<number>;
-  removePolicyMetadata(policy: string[], trx: Knex.Transaction): Promise<void>;
-}
 
 export class DataBasePolicyMetadataStorage implements PolicyMetadataStorage {
   constructor(private readonly knex: Knex<any, any[]>) {}

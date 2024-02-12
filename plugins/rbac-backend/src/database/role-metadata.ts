@@ -4,33 +4,9 @@ import { Knex } from 'knex';
 
 import { RoleMetadata } from '@janus-idp/backstage-plugin-rbac-common';
 
+import { RoleMetadataDao, RoleMetadataStorage } from './meta-data-storage';
+
 export const ROLE_METADATA_TABLE = 'role-metadata';
-
-export interface RoleMetadataDao extends RoleMetadata {
-  id?: number;
-  roleEntityRef: string;
-}
-
-export interface RoleMetadataStorage {
-  findRoleMetadata(
-    roleEntityRef: string,
-    trx?: Knex.Transaction,
-  ): Promise<RoleMetadata | undefined>;
-  createRoleMetadata(
-    roleMetadata: RoleMetadata,
-    roleEntityRef: string,
-    trx: Knex.Transaction,
-  ): Promise<number>;
-  updateRoleMetadata(
-    roleMetadata: RoleMetadataDao,
-    roleEntityRef: string,
-    trx: Knex.Transaction,
-  ): Promise<void>;
-  removeRoleMetadata(
-    roleEntityRef: string,
-    trx: Knex.Transaction,
-  ): Promise<void>;
-}
 
 export class DataBaseRoleMetadataStorage implements RoleMetadataStorage {
   constructor(private readonly knex: Knex<any, any[]>) {}
