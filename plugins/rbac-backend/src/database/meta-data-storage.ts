@@ -48,8 +48,8 @@ export interface RoleMetadataStorage {
   ): Promise<number>;
 
   updateRoleMetadata(
-    roleMetadata: RoleMetadataDao,
-    roleEntityRef: string,
+    newRoleMetadataDao: RoleMetadataDao,
+    oldRoleEntityRef: string,
     trx: Knex.Transaction,
   ): Promise<void>;
 
@@ -57,4 +57,28 @@ export interface RoleMetadataStorage {
     roleEntityRef: string,
     trx: Knex.Transaction,
   ): Promise<void>;
+}
+
+export function policyDAOToMetadata(
+  dao: PermissionPolicyMetadataDao,
+): PermissionPolicyMetadata {
+  return {
+    source: dao.source,
+  };
+}
+
+export function roleDAOToMetadata(dao: RoleMetadataDao): RoleMetadata {
+  return {
+    source: dao.source,
+  };
+}
+
+export function metadataToRoleDAO(
+  roleMetadata: RoleMetadata,
+  roleEntityRef: string,
+): RoleMetadataDao {
+  return {
+    roleEntityRef,
+    source: roleMetadata.source,
+  };
 }

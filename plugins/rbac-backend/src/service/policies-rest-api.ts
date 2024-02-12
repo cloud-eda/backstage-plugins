@@ -42,7 +42,7 @@ import {
 import { PluginIdProvider } from '@janus-idp/backstage-plugin-rbac-node';
 
 import { ConditionalStorage } from '../database/conditional-storage';
-import { RoleMetadataStorage } from '../database/role-metadata';
+import { RoleMetadataStorage } from '../database/meta-data-storage';
 import { policyToString } from '../helper';
 import { EnforcerDelegate } from './enforcer-delegate';
 import { PluginPermissionMetadataCollector } from './plugin-endpoints';

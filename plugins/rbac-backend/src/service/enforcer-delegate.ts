@@ -11,8 +11,8 @@ import {
 import {
   PermissionPolicyMetadataDao,
   PolicyMetadataStorage,
-} from '../database/policy-metadata-storage';
-import { RoleMetadataStorage } from '../database/role-metadata';
+  RoleMetadataStorage,
+} from '../database/meta-data-storage';
 import { policiesToString, policyToString } from '../helper';
 
 export class EnforcerDelegate {

@@ -34,8 +34,8 @@ import { CasbinDBAdapterFactory } from '../database/casbin-adapter-factory';
 import {
   PermissionPolicyMetadataDao,
   PolicyMetadataStorage,
-} from '../database/policy-metadata-storage';
-import { RoleMetadataStorage } from '../database/role-metadata';
+  RoleMetadataStorage,
+} from '../database/meta-data-storage';
 import { EnforcerDelegate } from './enforcer-delegate';
 import { MODEL } from './permission-model';
 import { RBACPermissionPolicy } from './permission-policy';

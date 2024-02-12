@@ -23,7 +23,7 @@ import {
   Source,
 } from '@janus-idp/backstage-plugin-rbac-common';
 
-import { RoleMetadataStorage } from '../database/role-metadata';
+import { RoleMetadataStorage } from '../database/meta-data-storage';
 import { EnforcerDelegate } from './enforcer-delegate';
 import { RBACPermissionPolicy } from './permission-policy';
 import {

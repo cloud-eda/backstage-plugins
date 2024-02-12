@@ -4,11 +4,11 @@ import { TestDatabaseId, TestDatabases } from '@backstage/backend-test-utils';
 import * as Knex from 'knex';
 import { createTracker, MockClient } from 'knex-mock-client';
 
+import { RoleMetadataDao } from './meta-data-storage';
 import { migrate } from './migration';
 import {
   DataBaseRoleMetadataStorage,
   ROLE_METADATA_TABLE,
-  RoleMetadataDao,
 } from './role-metadata';
 
 jest.setTimeout(60000);

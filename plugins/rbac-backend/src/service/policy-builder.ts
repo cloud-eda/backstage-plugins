@@ -18,6 +18,12 @@ import { PluginIdProvider } from '@janus-idp/backstage-plugin-rbac-node';
 
 import { CasbinDBAdapterFactory } from '../database/casbin-adapter-factory';
 import { DataBaseConditionalStorage } from '../database/conditional-storage';
+import { DataBasePolicyMetadataInMemoryStorage } from '../database/in-memory/policy-metadata-runtime-storage';
+import { DataBaseRoleMetadataInMemoryStorage } from '../database/in-memory/role-metadata-runtime-storage';
+import {
+  PolicyMetadataStorage,
+  RoleMetadataStorage,
+} from '../database/meta-data-storage';
 import { migrate } from '../database/migration';
 import { DataBasePolicyMetadataStorage } from '../database/policy-metadata-storage';
 import { DataBaseRoleMetadataStorage } from '../database/role-metadata';
@@ -47,12 +53,21 @@ export class PolicyBuilder {
     const databaseManager = await DatabaseManager.fromConfig(
       env.config,
     ).forPlugin('permission');
+    await migrate(databaseManager);
+    const knex = await databaseManager.getClient();
+    const conditionStorage = new DataBaseConditionalStorage(knex);
+    let policyMetadataStorage: PolicyMetadataStorage;
+    let roleMetadataStorage: RoleMetadataStorage;
+
     // Database adapter work
     if (databaseEnabled) {
       adapter = await new CasbinDBAdapterFactory(
         env.config,
         databaseManager,
       ).createAdapter();
+
+      policyMetadataStorage = new DataBasePolicyMetadataStorage(knex);
+      roleMetadataStorage = new DataBaseRoleMetadataStorage(knex);
     } else {
       adapter = new FileAdapter(
         resolvePackagePath(
@@ -60,7 +75,11 @@ export class PolicyBuilder {
           './model/rbac-policy.csv',
         ),
       );
-      env.logger.info('rbac backend plugin uses only file storage');
+
+      policyMetadataStorage = new DataBasePolicyMetadataInMemoryStorage();
+      roleMetadataStorage = new DataBaseRoleMetadataInMemoryStorage();
+
+      env.logger.warn('rbac backend plugin uses only file storage.');
     }
 
     const enf = await newEnforcer(newModelFromString(MODEL), adapter);
@@ -77,13 +96,6 @@ export class PolicyBuilder {
     enf.enableAutoBuildRoleLinks(false);
     await enf.buildRoleLinks();
 
-    await migrate(databaseManager);
-    const knex = await databaseManager.getClient();
-
-    const conditionStorage = new DataBaseConditionalStorage(knex);
-
-    const policyMetadataStorage = new DataBasePolicyMetadataStorage(knex);
-    const roleMetadataStorage = new DataBaseRoleMetadataStorage(knex);
     const enforcerDelegate = new EnforcerDelegate(
       enf,
       policyMetadataStorage,

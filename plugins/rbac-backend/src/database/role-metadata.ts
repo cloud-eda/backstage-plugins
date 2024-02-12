@@ -4,7 +4,12 @@ import { Knex } from 'knex';
 
 import { RoleMetadata } from '@janus-idp/backstage-plugin-rbac-common';
 
-import { RoleMetadataDao, RoleMetadataStorage } from './meta-data-storage';
+import {
+  metadataToRoleDAO,
+  roleDAOToMetadata,
+  RoleMetadataDao,
+  RoleMetadataStorage,
+} from './meta-data-storage';
 
 export const ROLE_METADATA_TABLE = 'role-metadata';
 
@@ -17,7 +22,7 @@ export class DataBaseRoleMetadataStorage implements RoleMetadataStorage {
   ): Promise<RoleMetadata | undefined> {
     const roleMetadataDao = await this.findRoleMetadataDao(roleEntityRef, trx);
     if (roleMetadataDao) {
-      return this.daoToMetadata(roleMetadataDao);
+      return roleDAOToMetadata(roleMetadataDao);
     }
     return undefined;
   }
@@ -45,7 +50,7 @@ export class DataBaseRoleMetadataStorage implements RoleMetadataStorage {
       );
     }
 
-    const metadataDao = this.metadataToDao(roleMetadata, roleEntityRef);
+    const metadataDao = metadataToRoleDAO(roleMetadata, roleEntityRef);
     const result = await trx<RoleMetadataDao>(ROLE_METADATA_TABLE)
       .insert(metadataDao)
       .returning<[{ id: number }]>('id');
@@ -60,17 +65,17 @@ export class DataBaseRoleMetadataStorage implements RoleMetadataStorage {
 
   async updateRoleMetadata(
     newRoleMetadataDao: RoleMetadataDao,
-    roleEntityRef: string,
+    oldRoleEntityRef: string,
     trx: Knex.Transaction,
   ): Promise<void> {
     const currentMetadataDao = await this.findRoleMetadataDao(
-      roleEntityRef,
+      oldRoleEntityRef,
       trx,
     );
 
     if (!currentMetadataDao) {
       throw new NotFoundError(
-        `A metadata for role '${roleEntityRef}' was not found`,
+        `A metadata for role '${oldRoleEntityRef}' was not found`,
       );
     }
 
@@ -109,21 +114,5 @@ export class DataBaseRoleMetadataStorage implements RoleMetadataStorage {
     await trx<RoleMetadataDao>(ROLE_METADATA_TABLE)
       .delete()
       .whereIn('id', [metadataDao.id!]);
-  }
-
-  private daoToMetadata(dao: RoleMetadataDao): RoleMetadata {
-    return {
-      source: dao.source,
-    };
-  }
-
-  private metadataToDao(
-    roleMetadata: RoleMetadata,
-    roleEntityRef: string,
-  ): RoleMetadataDao {
-    return {
-      roleEntityRef,
-      source: roleMetadata.source,
-    };
   }
 }

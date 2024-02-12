@@ -10,6 +10,7 @@ import {
 import { policyToString } from '../helper';
 import {
   PermissionPolicyMetadataDao,
+  policyDAOToMetadata,
   PolicyMetadataStorage,
 } from './meta-data-storage';
 
@@ -32,7 +33,7 @@ export class DataBasePolicyMetadataStorage implements PolicyMetadataStorage {
   ): Promise<PermissionPolicyMetadata | undefined> {
     const policyMetadataDao = await this.findPolicyMetadataDao(policy, trx);
     if (policyMetadataDao) {
-      return this.daoToMetadata(policyMetadataDao);
+      return policyDAOToMetadata(policyMetadataDao);
     }
     return undefined;
   }
@@ -90,13 +91,5 @@ export class DataBasePolicyMetadataStorage implements PolicyMetadataStorage {
       .table(POLICY_METADATA_TABLE)
       .delete()
       .whereIn('id', [metadataDao.id]);
-  }
-
-  private daoToMetadata(
-    dao: PermissionPolicyMetadataDao,
-  ): PermissionPolicyMetadata {
-    return {
-      source: dao.source,
-    };
   }
 }

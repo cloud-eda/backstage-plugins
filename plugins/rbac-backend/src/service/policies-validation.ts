@@ -7,7 +7,7 @@ import {
   Source,
 } from '@janus-idp/backstage-plugin-rbac-common';
 
-import { RoleMetadataStorage } from '../database/role-metadata';
+import { RoleMetadataStorage } from '../database/meta-data-storage';
 
 export function validatePolicy(policy: RoleBasedPolicy): Error | undefined {
   const err = validateEntityReference(policy.entityReference);

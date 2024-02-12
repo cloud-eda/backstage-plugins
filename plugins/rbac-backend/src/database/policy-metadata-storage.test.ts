@@ -7,10 +7,10 @@ import { createTracker, MockClient } from 'knex-mock-client';
 import { PermissionPolicyMetadata } from '@janus-idp/backstage-plugin-rbac-common';
 
 import { policyToString } from '../helper';
+import { PermissionPolicyMetadataDao } from './meta-data-storage';
 import { migrate } from './migration';
 import {
   DataBasePolicyMetadataStorage,
-  PermissionPolicyMetadataDao,
   POLICY_METADATA_TABLE,
 } from './policy-metadata-storage';
 
