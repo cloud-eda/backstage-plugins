@@ -86,6 +86,7 @@ export class BackstageRoleManager implements RoleManager {
     name2: string,
     ...domain: string[]
   ): Promise<boolean> {
+    console.log(`==== hasLink: ${name1} ${name2}`);
     if (domain.length > 0) {
       throw new Error('domain argument is not supported.');
     }
@@ -110,8 +111,10 @@ export class BackstageRoleManager implements RoleManager {
       return false;
     }
 
-    if (await this.cacheResults(name1)) {
-      const cachedResult = this.roleCache?.get(name1)!;
+    await this.cacheResults(name1);
+    if (this.roleCache) {
+      const cachedResult = this.roleCache.get(name1)!;
+      console.log(`return cached result!!!`);
 
       return cachedResult.has(name2);
     }
@@ -166,7 +169,8 @@ export class BackstageRoleManager implements RoleManager {
    * because we don't support role inheritance and we notify casbin about end of the role sub-tree.
    */
   async getRoles(name: string, ..._domain: string[]): Promise<string[]> {
-    if (await this.cacheResults(name)) {
+    await this.cacheResults(name);
+    if (this.roleCache) {
       const cachedResult = this.roleCache?.get(name)!;
 
       return Array.from(cachedResult);
@@ -257,6 +261,7 @@ export class BackstageRoleManager implements RoleManager {
       this.catalogDBClient,
     );
     await memo.buildUserGraph(memo);
+    console.log(`==== build graph: ${name1}`);
 
     memo.debugNodesAndEdges(this.log, name1);
     return memo;
@@ -279,20 +284,22 @@ export class BackstageRoleManager implements RoleManager {
     return allRoles;
   }
 
-  private async cacheResults(name1: string): Promise<boolean> {
+  private async cacheResults(name1: string) {
     if (this.roleCache) {
       if (!this.roleCache.get(name1) || this.roleCache.shouldUpdate(name1)) {
+        console.log(
+          `===== it should happen once for ${name1}!!! ${this.roleCache.get(
+            name1,
+          )} ${this.roleCache.shouldUpdate(name1)})`,
+        );
         const memo = await this.buildGraph(name1);
 
         if (this.detectCycleError(memo, name1)) {
           const roles = new Set(this.matchRoles(memo.getNodes()));
-
+          console.log(`===== put cache !!!! ${name1}`);
           this.roleCache?.put(name1, roles);
-
-          return true;
         }
       }
     }
-    return false;
   }
 }

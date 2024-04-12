@@ -4,6 +4,7 @@ export class RoleCache {
   private maxEntries: number;
   private maxAge: number;
   constructor(maxEntries?: number, maxAge?: number) {
+    console.log(`===== Create new cache!!!! ${new Date().toUTCString()}`);
     this.maxEntries = maxEntries || 100;
     this.maxAge = maxAge || 60 * 60 * 1000; // 1 hour (60 minutes * 60 seconds * 1000 milliseconds) <-- double check this math? I think we want is in millisecond
   }
@@ -12,10 +13,7 @@ export class RoleCache {
     const hasKey = this.cache.has(key);
     if (!hasKey) return undefined;
 
-    const { data, timestamp } = this.cache.get(key)!;
-    this.cache.delete(key);
-    this.cache.set(key, { data, timestamp });
-
+    const { data } = this.cache.get(key)!;
     return data;
   }
 

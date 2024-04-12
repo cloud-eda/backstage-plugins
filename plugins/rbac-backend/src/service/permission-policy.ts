@@ -285,6 +285,7 @@ export class RBACPermissionPolicy implements PermissionPolicy {
       const userEntityRef = identityResp.identity.userEntityRef;
       const permissionName = request.permission.name;
 
+      const startTime = new Date();
       if (isResourcePermission(request.permission)) {
         const resourceType = request.permission.resourceType;
 
@@ -317,6 +318,8 @@ export class RBACPermissionPolicy implements PermissionPolicy {
         status = await this.isAuthorized(userEntityRef, permissionName, action);
       }
 
+      const timeDiffInSecond = getSecondsDifference(startTime, new Date());
+
       const result = status ? AuthorizeResult.ALLOW : AuthorizeResult.DENY;
       this.logger.info(
         `${userEntityRef} is ${result} for permission '${
@@ -325,7 +328,7 @@ export class RBACPermissionPolicy implements PermissionPolicy {
           isResourcePermission(request.permission)
             ? `, resource type '${request.permission.resourceType}'`
             : ''
-        } and action ${action}`,
+        } and action ${action}, time diff is ${timeDiffInSecond}`,
       );
       return Promise.resolve({
         result: result,
@@ -432,4 +435,18 @@ export class RBACPermissionPolicy implements PermissionPolicy {
     }
     return undefined;
   }
+}
+
+function getSecondsDifference(date1: Date, date2: Date): number {
+  // Convert both dates to Unix timestamps (milliseconds)
+  const timestamp1 = date1.getTime();
+  const timestamp2 = date2.getTime();
+
+  // Calculate the difference in milliseconds
+  const differenceInMilliseconds = Math.abs(timestamp2 - timestamp1);
+
+  // Convert milliseconds to seconds
+  const differenceInSeconds = differenceInMilliseconds / 1000;
+
+  return differenceInSeconds;
 }

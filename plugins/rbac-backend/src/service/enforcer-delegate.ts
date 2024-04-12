@@ -1,6 +1,11 @@
 import { NotAllowedError, NotFoundError } from '@backstage/errors';
 
-import { Enforcer, newEnforcer, newModelFromString } from 'casbin';
+import {
+  Enforcer,
+  newEnforcer,
+  newModelFromString,
+  StringAdapter,
+} from 'casbin';
 import { Knex } from 'knex';
 
 import {
@@ -580,24 +585,42 @@ export class EnforcerDelegate {
     resourceType: string,
     action: string,
   ): Promise<boolean> {
-    const filter = [
-      {
-        ptype: 'p',
-        v1: resourceType,
-        v2: action,
-      },
-      {
-        ptype: 'g',
-        v0: entityRef,
-      },
-    ];
+    // const filter = [
+    //   {
+    //     ptype: 'p',
+    //     v1: resourceType,
+    //     v2: action,
+    //   },
+    //   {
+    //     ptype: 'g',
+    //     v0: entityRef,
+    //   },
+    // ];
 
-    const adapt = this.enforcer.getAdapter();
+    // const adapt = this.enforcer.getAdapter();
+    const adapter = new StringAdapter(
+      'p, role:default/abc, catalog.entity.read, read, allow',
+    );
     const roleManager = this.enforcer.getRoleManager();
-    const tempEnforcer = await newEnforcer(newModelFromString(MODEL), adapt);
-    tempEnforcer.setRoleManager(roleManager);
 
-    await tempEnforcer.loadFilteredPolicy(filter);
+    const tempEnforcer = await newEnforcer(newModelFromString(MODEL), adapter);
+    tempEnforcer.setRoleManager(roleManager);
+    tempEnforcer.enableAutoBuildRoleLinks(false);
+    await tempEnforcer.buildRoleLinks();
+
+    // await tempEnforcer.loadFilteredPolicy(filter);
+
+    const polices = await this.enforcer.getFilteredPolicy(
+      1,
+      ...[resourceType, action],
+    );
+    for (const policy of polices) {
+      await tempEnforcer.addPolicy(...policy);
+    }
+
+    // const groupPolicies = await this.enforcer.getFilteredGroupingPolicy(0, ...[entityRef]);
+    // await tempEnforcer.addGroupingPolicies(groupPolicies);
+    // console.log(`$$$$$ ${JSON.stringify(polices)} ${JSON.stringify(groupPolicies)}`)
 
     return await tempEnforcer.enforce(entityRef, resourceType, action);
   }
