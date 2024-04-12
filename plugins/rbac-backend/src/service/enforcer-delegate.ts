@@ -584,45 +584,61 @@ export class EnforcerDelegate {
     entityRef: string,
     resourceType: string,
     action: string,
+    roles: string[],
   ): Promise<boolean> {
-    // const filter = [
-    //   {
-    //     ptype: 'p',
-    //     v1: resourceType,
-    //     v2: action,
-    //   },
-    //   {
-    //     ptype: 'g',
-    //     v0: entityRef,
-    //   },
-    // ];
+    // const adapter = new StringAdapter(
+    //   'p, role:default/abc, catalog.entity.read, read, allow',
+    // );
+    // const roleManager = this.enforcer.getRoleManager();
 
-    // const adapt = this.enforcer.getAdapter();
-    const adapter = new StringAdapter(
-      'p, role:default/abc, catalog.entity.read, read, allow',
-    );
-    const roleManager = this.enforcer.getRoleManager();
+    // const tempEnforcer = await newEnforcer(newModelFromString(MODEL), adapter);
+    // tempEnforcer.setRoleManager(roleManager);
+    // tempEnforcer.enableAutoBuildRoleLinks(false);
+    // await tempEnforcer.buildRoleLinks();
 
-    const tempEnforcer = await newEnforcer(newModelFromString(MODEL), adapter);
-    tempEnforcer.setRoleManager(roleManager);
-    tempEnforcer.enableAutoBuildRoleLinks(false);
-    await tempEnforcer.buildRoleLinks();
+    // const polices = await this.enforcer.getFilteredPolicy(
+    //   1,
+    //   ...[resourceType, action],
+    // );
+    // for (const policy of polices) {
+    //   await tempEnforcer.addPolicy(...policy);
+    // }
 
-    // await tempEnforcer.loadFilteredPolicy(filter);
+    // return await tempEnforcer.enforce(entityRef, resourceType, action);
 
-    const polices = await this.enforcer.getFilteredPolicy(
-      1,
-      ...[resourceType, action],
-    );
-    for (const policy of polices) {
-      await tempEnforcer.addPolicy(...policy);
+    // return await this.enforcer.enforce(entityRef, resourceType, action);
+
+    const start = new Date().getTime();
+    let end;
+    const filter = [];
+    if (roles.length > 0) {
+      roles.forEach(role =>
+        filter.push({ ptype: 'p', v0: role, v1: resourceType, v2: action }),
+      );
+    } else {
+      filter.push({ ptype: 'p', v1: resourceType, v2: action });
     }
 
-    // const groupPolicies = await this.enforcer.getFilteredGroupingPolicy(0, ...[entityRef]);
-    // await tempEnforcer.addGroupingPolicies(groupPolicies);
-    // console.log(`$$$$$ ${JSON.stringify(polices)} ${JSON.stringify(groupPolicies)}`)
+    const adapt = this.enforcer.getAdapter();
+    const roleManager = this.enforcer.getRoleManager();
+    const tempEnforcer = new Enforcer();
+    await tempEnforcer.initWithModelAndAdapter(
+      newModelFromString(MODEL),
+      adapt,
+      true,
+    );
+    end = new Date().getTime();
+    console.log(`***** It took ${end - start} to newEnforcer`);
+    tempEnforcer.setRoleManager(roleManager);
+
+    await tempEnforcer.loadFilteredPolicy(filter);
+
+    end = new Date().getTime();
+    console.log(`***** It took ${end - start} to filter the policy`);
 
     return await tempEnforcer.enforce(entityRef, resourceType, action);
+
+    // return this.enforcer.enforce(entityRef, resourceType, action);
   }
 
   async getMetadata(policy: string[]): Promise<PermissionPolicyMetadata> {
