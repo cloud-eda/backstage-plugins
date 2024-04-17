@@ -1,3 +1,17 @@
+## @janus-idp/cli [1.8.0](https://github.com/janus-idp/backstage-plugins/compare/@janus-idp/cli@1.7.10...@janus-idp/cli@1.8.0) (2024-04-15)
+
+
+### Features
+
+* checkPluginVersion.sh bump plugins for 1.2.0 release ([#1511](https://github.com/janus-idp/backstage-plugins/issues/1511)) ([73c6588](https://github.com/janus-idp/backstage-plugins/commit/73c6588adb7e8c20907b06f2a8ef248cfd4332e4))
+
+## @janus-idp/cli [1.7.10](https://github.com/janus-idp/backstage-plugins/compare/@janus-idp/cli@1.7.9...@janus-idp/cli@1.7.10) (2024-04-09)
+
+
+### Bug Fixes
+
+* **cli:** `node_modules` of the main plugin unexpectedly copied to the `dist-dynamic` folder. ([#1482](https://github.com/janus-idp/backstage-plugins/issues/1482)) ([deaa19d](https://github.com/janus-idp/backstage-plugins/commit/deaa19d2aaf9e25617911e8bebc67ff8d7471010))
+
 ## @janus-idp/cli [1.7.9](https://github.com/janus-idp/backstage-plugins/compare/@janus-idp/cli@1.7.8...@janus-idp/cli@1.7.9) (2024-04-09)
 
 

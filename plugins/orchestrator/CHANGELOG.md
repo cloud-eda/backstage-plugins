@@ -1,3 +1,40 @@
+## @janus-idp/backstage-plugin-orchestrator [1.9.3](https://github.com/janus-idp/backstage-plugins/compare/@janus-idp/backstage-plugin-orchestrator@1.9.2...@janus-idp/backstage-plugin-orchestrator@1.9.3) (2024-04-16)
+
+
+### Bug Fixes
+
+* fix typo in orchestrator documentation ([#1508](https://github.com/janus-idp/backstage-plugins/issues/1508)) ([bfa360a](https://github.com/janus-idp/backstage-plugins/commit/bfa360af97b5daf1902c267cd682e51cb6d71c83))
+
+## @janus-idp/backstage-plugin-orchestrator [1.9.2](https://github.com/janus-idp/backstage-plugins/compare/@janus-idp/backstage-plugin-orchestrator@1.9.1...@janus-idp/backstage-plugin-orchestrator@1.9.2) (2024-04-15)
+
+
+
+### Dependencies
+
+* **@janus-idp/cli:** upgraded to 1.8.0
+
+## @janus-idp/backstage-plugin-orchestrator [1.9.1](https://github.com/janus-idp/backstage-plugins/compare/@janus-idp/backstage-plugin-orchestrator@1.9.0...@janus-idp/backstage-plugin-orchestrator@1.9.1) (2024-04-15)
+
+
+### Documentation
+
+* **orchestrator:** add a quickstart for users ([#1499](https://github.com/janus-idp/backstage-plugins/issues/1499)) ([28fe8da](https://github.com/janus-idp/backstage-plugins/commit/28fe8da644350facb4c414f1bd5ff48ba4801b24))
+
+## @janus-idp/backstage-plugin-orchestrator [1.9.0](https://github.com/janus-idp/backstage-plugins/compare/@janus-idp/backstage-plugin-orchestrator@1.8.9...@janus-idp/backstage-plugin-orchestrator@1.9.0) (2024-04-10)
+
+
+### Features
+
+* **orchestrator:** make workflow last run status as link to the workflow last run details page ([#1488](https://github.com/janus-idp/backstage-plugins/issues/1488)) ([fc2f94e](https://github.com/janus-idp/backstage-plugins/commit/fc2f94ed4ff2cb0795ba3b65eeea57eae3a8640c))
+
+## @janus-idp/backstage-plugin-orchestrator [1.8.9](https://github.com/janus-idp/backstage-plugins/compare/@janus-idp/backstage-plugin-orchestrator@1.8.8...@janus-idp/backstage-plugin-orchestrator@1.8.9) (2024-04-09)
+
+
+
+### Dependencies
+
+* **@janus-idp/cli:** upgraded to 1.7.10
+
 ## @janus-idp/backstage-plugin-orchestrator [1.8.8](https://github.com/janus-idp/backstage-plugins/compare/@janus-idp/backstage-plugin-orchestrator@1.8.7...@janus-idp/backstage-plugin-orchestrator@1.8.8) (2024-04-09)
 
 

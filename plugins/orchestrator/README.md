@@ -10,7 +10,7 @@ The Backstage Orchestrator plugin aims to provide a better option to Scaffolder,
 
 The orchestrator relies on [SonataFlow](https://sonataflow.org/), a powerful tool for building cloud-native workflow applications.
 
-The main idea is to keep the same user experience for users, levering the UI components, input forms, and flow that Scaffolder provides, this way it should be straightforward for users and transparent no matter whether using Templates or Workflows, both can live together being compatible with integration points.
+The main idea is to keep the same user experience for users, leveraging the UI components, input forms, and flow that Scaffolder provides, this way it should be straightforward for users and transparent no matter whether using Templates or Workflows, both can live together being compatible with integration points.
 
 The orchestrator controls the flow orchestrating operations/tasks that may be executed in any external service including Scaffolder Actions, this way it is possible to leverage any existing Action hence Software Templates can be easily migrated to workflows opening the door to extend them to more complex use cases.
 
@@ -209,16 +209,7 @@ For more information about the configuration options, including other optional p
 
 The Orchestrator plugin enhances the Backstage with the execution of developer self-service flows. It provides a graphical editor to visualize workflow definitions, and a dashboard to monitor the execution of the workflows.
 
-#### Prerequisites
-
-- Your Backstage application is installed and running.
-- You have installed the Orchestrator plugin. For the installation process, see [Installation](#installation).
-
-#### Procedure
-
-1. Open your Backstage application.
-1. Click the **Orchestrator** tab from the left-side panel to navigate to the **Orchestrator** main page.
-1. Inside the **Orchestrator** main page, you can see the list of workflow definitions that are available in your Backstage application.
+Refer to the [Quick start](https://github.com/batzionb/backstage-plugins/blob/orchestratorquickstart/plugins/orchestrator/docs/quickstart.md) to install the Orchestrator using the helm chart and execute a sample workflow through the Red Hat Developer Hub orchestrator plugin UI.
 
 ## OpenAPI
 
