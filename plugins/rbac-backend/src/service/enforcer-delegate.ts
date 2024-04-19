@@ -1,6 +1,11 @@
 import { NotAllowedError, NotFoundError } from '@backstage/errors';
 
-import { Enforcer, newModelFromString } from 'casbin';
+import {
+  Enforcer,
+  newEnforcer,
+  newModelFromString,
+  StringAdapter,
+} from 'casbin';
 import { Knex } from 'knex';
 
 import {
@@ -603,28 +608,64 @@ export class EnforcerDelegate {
     action: string,
     roles: string[],
   ): Promise<boolean> {
-    const filter = [];
+    const adapter = new StringAdapter(
+      'p, role:default/abc, catalog.entity.read, read, allow',
+    );
+
+    const tempEnforcer = await newEnforcer(newModelFromString(MODEL), adapter);
+    // #const roleManager = this.enforcer.getRoleManager();
+    // #tempEnforcer.setRoleManager(roleManager);
+    // #tempEnforcer.enableAutoBuildRoleLinks(false);
+    // #await tempEnforcer.buildRoleLinks();
+
+    const filteredPolicies: string[][] = [];
     if (roles.length > 0) {
-      roles.forEach(role => {
-        filter.push({ ptype: 'p', v0: role, v1: resourceType, v2: action });
-      });
+      for (const role of roles) {
+        const policies = await this.enforcer.getFilteredPolicy(
+          0,
+          ...[role, resourceType, action],
+        );
+        filteredPolicies.push(...policies);
+      }
     } else {
-      filter.push({ ptype: 'p', v1: resourceType, v2: action });
+      const policies = await this.enforcer.getFilteredPolicy(
+        1,
+        ...[resourceType, action],
+      );
+      filteredPolicies.push(...policies);
     }
 
-    const adapt = this.enforcer.getAdapter();
-    const roleManager = this.enforcer.getRoleManager();
-    const tempEnforcer = new Enforcer();
-    await tempEnforcer.initWithModelAndAdapter(
-      newModelFromString(MODEL),
-      adapt,
-      true,
-    );
-    tempEnforcer.setRoleManager(roleManager);
-
-    await tempEnforcer.loadFilteredPolicy(filter);
+    // console.log(`${JSON.stringify(filteredPolicies)}`)
+    for (const policy of filteredPolicies) {
+      await tempEnforcer.addPolicy(...policy);
+    }
+    for (const role of roles) {
+      await tempEnforcer.addGroupingPolicy(...[entityRef, role]);
+    }
 
     return await tempEnforcer.enforce(entityRef, resourceType, action);
+
+    // const filter = [];
+    // if (roles.length > 0) {
+    //   roles.forEach(role => {
+    //     filter.push({ ptype: 'p', v0: role, v1: resourceType, v2: action });
+    //   });
+    // } else {
+    //   filter.push({ ptype: 'p', v1: resourceType, v2: action });
+    // }
+
+    // const adapt = this.enforcer.getAdapter();
+    // const roleManager = this.enforcer.getRoleManager();
+    // const tempEnforcer = new Enforcer();
+    // await tempEnforcer.initWithModelAndAdapter(
+    //   newModelFromString(MODEL),
+    //   adapt,
+    //   true,
+    // );
+    // tempEnforcer.setRoleManager(roleManager);
+    // await tempEnforcer.loadFilteredPolicy(filter);
+
+    // return await tempEnforcer.enforce(entityRef, resourceType, action);
   }
 
   async getMetadata(policy: string[]): Promise<PermissionPolicyMetadata> {
