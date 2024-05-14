@@ -2749,7 +2749,8 @@ describe('REST policies api', () => {
       const result = await request(app).delete('/roles/conditions/1').send();
 
       expect(result.statusCode).toEqual(204);
-      expect(mockIdentityClient.getIdentity).toHaveBeenCalledTimes(1);
+      // first time for authorize, second time to retrieve modifiedBy author
+      expect(mockIdentityClient.getIdentity).toHaveBeenCalledTimes(2);
     });
 
     it('should fail to delete condition decision by id', async () => {
@@ -2913,7 +2914,8 @@ describe('REST policies api', () => {
       expect(result.statusCode).toBe(201);
       expect(validateRoleConditionMock).toHaveBeenCalledWith(roleCondition);
       expect(result.body).toEqual({ id: 1 });
-      expect(mockIdentityClient.getIdentity).toHaveBeenCalledTimes(1);
+      // first time for authorize, second time to retrieve modifiedBy author
+      expect(mockIdentityClient.getIdentity).toHaveBeenCalledTimes(2);
     });
   });
 
@@ -2992,25 +2994,30 @@ describe('REST policies api', () => {
       expect(validateRoleConditionMock).toHaveBeenCalledWith(conditionDecision);
 
       expect(result.statusCode).toBe(200);
-      expect(conditionalStorage.updateCondition).toHaveBeenCalledWith(1, {
-        id: 1,
-        pluginId: 'catalog',
-        roleEntityRef: 'role:default/test',
-        resourceType: 'catalog-entity',
-        permissionMapping: [
-          {
-            action: 'read',
-            name: 'catalog.entity.read',
-          },
-        ],
-        result: AuthorizeResult.CONDITIONAL,
-        conditions: {
-          rule: 'IS_ENTITY_OWNER',
+      expect(conditionalStorage.updateCondition).toHaveBeenCalledWith(
+        1,
+        {
+          id: 1,
+          pluginId: 'catalog',
+          roleEntityRef: 'role:default/test',
           resourceType: 'catalog-entity',
-          params: { claims: ['group:default/team-a'] },
+          permissionMapping: [
+            {
+              action: 'read',
+              name: 'catalog.entity.read',
+            },
+          ],
+          result: AuthorizeResult.CONDITIONAL,
+          conditions: {
+            rule: 'IS_ENTITY_OWNER',
+            resourceType: 'catalog-entity',
+            params: { claims: ['group:default/team-a'] },
+          },
         },
-      });
-      expect(mockIdentityClient.getIdentity).toHaveBeenCalledTimes(1);
+        'user:default/guest',
+      );
+      // first time for authorize, second time to retrieve modifiedBy author
+      expect(mockIdentityClient.getIdentity).toHaveBeenCalledTimes(2);
     });
   });
 
