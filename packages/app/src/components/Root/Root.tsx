@@ -17,6 +17,7 @@ import {
   UserSettingsSignInAvatar,
 } from '@backstage/plugin-user-settings';
 
+import StorageIcon from '@material-ui/icons/Storage';
 import CreateComponentIcon from '@mui/icons-material/AddCircleOutline';
 import ExtensionIcon from '@mui/icons-material/Extension';
 import HomeIcon from '@mui/icons-material/Home';
@@ -25,6 +26,8 @@ import MenuIcon from '@mui/icons-material/Menu';
 import MapIcon from '@mui/icons-material/MyLocation';
 import SearchIcon from '@mui/icons-material/Search';
 import { makeStyles } from 'tss-react/mui';
+
+import { Administration } from '@janus-idp/backstage-plugin-rbac';
 
 import LogoFull from './LogoFull';
 import LogoIcon from './LogoIcon';
@@ -63,6 +66,7 @@ export const Root = ({
   <SidebarPage>
     <Sidebar>
       <SidebarLogo />
+      <Administration />
       <SidebarGroup label="Search" icon={<SearchIcon />} to="/search">
         <SidebarSearchModal />
       </SidebarGroup>
@@ -98,6 +102,7 @@ export const Root = ({
             text="Tech Radar"
           />
         </SidebarScrollWrapper>
+        {/* <SidebarItem icon={StorageIcon} to="ocm" text="Clusters" /> */}
       </SidebarGroup>
       <SidebarSpace />
       <SidebarDivider />

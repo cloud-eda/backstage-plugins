@@ -4,12 +4,15 @@ import {
   createBackendPlugin,
 } from '@backstage/backend-plugin-api';
 
+// import * as util from 'util';
 import { PolicyBuilder } from '@janus-idp/backstage-plugin-rbac-backend';
 import {
   PluginIdProvider,
   PluginIdProviderExtensionPoint,
   pluginIdProviderExtensionPoint,
 } from '@janus-idp/backstage-plugin-rbac-node';
+
+// import { format } from 'winston';
 
 /**
  * RBAC plugin
@@ -54,7 +57,29 @@ export const rbacPlugin = createBackendPlugin({
         auth,
         httpAuth,
       }) {
-        const winstonLogger = loggerToWinstonLogger(logger);
+        const winstonLogger = loggerToWinstonLogger(
+          logger,
+          // {
+          // format: format.combine(
+          //   format.timestamp(),
+          //   format.printf(({ level, message, timestamp }) => {
+          //     return `${timestamp} ${level}: ${message}`;
+          //   })
+          // )
+          // }
+        );
+
+        // // Example TypeScript object
+        // const myObject = { key1: 'value1', key2: 'value2', a: {a: 2}};
+
+        // // Convert TypeScript object to string using util.inspect()
+        // const objectString = JSON.stringify(myObject);
+
+        // // Format the string if necessary using util.format()
+        // const formattedString = util.format(objectString);
+
+        // // Log the formatted string using Winston logger
+        // logger.info(`some text ${formattedString}`);
 
         http.use(
           await PolicyBuilder.build(

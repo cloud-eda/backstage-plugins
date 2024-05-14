@@ -11,6 +11,7 @@ import * as Knex from 'knex';
 import { MockClient } from 'knex-mock-client';
 import request from 'supertest';
 
+import { DefaultAuditLogger } from '@janus-idp/backstage-plugin-audit-log-common';
 import {
   PermissionAction,
   PermissionInfo,
@@ -280,6 +281,12 @@ describe('REST policies api', () => {
         },
       );
 
+    const aLog = new DefaultAuditLogger({
+      authService: mockAuth,
+      httpAuthService: mockHttpAuth,
+      logger,
+    });
+
     const options: RouterOptions = {
       config: config,
       logger,
@@ -287,6 +294,7 @@ describe('REST policies api', () => {
       identity: mockIdentityClient,
       policy: await RBACPermissionPolicy.build(
         logger,
+        aLog,
         config,
         conditionalStorage,
         mockEnforcer as EnforcerDelegate,
@@ -305,6 +313,7 @@ describe('REST policies api', () => {
       conditionalStorage,
       backendPluginIDsProviderMock,
       roleMetadataStorageMock,
+      aLog,
     );
     const router = await server.serve();
     app = express().use(router);

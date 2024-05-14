@@ -30,6 +30,7 @@ import { Request } from 'express-serve-static-core';
 import { isEmpty, isEqual } from 'lodash';
 import { ParsedQs } from 'qs';
 
+import { AuditLogger } from '@janus-idp/backstage-plugin-audit-log-common';
 import {
   PermissionAction,
   PermissionInfo,
@@ -45,6 +46,7 @@ import {
 } from '@janus-idp/backstage-plugin-rbac-common';
 import { PluginIdProvider } from '@janus-idp/backstage-plugin-rbac-node';
 
+import { RoleEvents } from '../audit-log/audit-logger';
 import { ConditionalStorage } from '../database/conditional-storage';
 import {
   daoToMetadata,
@@ -72,6 +74,7 @@ export class PoliciesServer {
     private readonly conditionalStorage: ConditionalStorage,
     private readonly pluginIdProvider: PluginIdProvider,
     private readonly roleMetadata: RoleMetadataStorage,
+    private readonly defAuditLog: AuditLogger,
   ) {}
 
   private async authorize(
@@ -220,7 +223,15 @@ export class PoliciesServer {
 
         const processedPolicies = await this.processPolicies(policyRaw, true);
 
-        await this.enforcer.removePolicies(processedPolicies, 'rest');
+        // todo try/catch and log error
+        const user = await identity.getIdentity({ request });
+        const modifiedBy = user?.identity.userEntityRef!;
+        await this.enforcer.removePolicies(
+          processedPolicies,
+          'rest',
+          modifiedBy,
+        );
+
         response.status(204).end();
       },
     );
@@ -244,7 +255,15 @@ export class PoliciesServer {
 
       const processedPolicies = await this.processPolicies(policyRaw);
 
-      await this.enforcer.addPolicies(processedPolicies, 'rest');
+      const entityRef = processedPolicies[0][0];
+      const roleMetadata = await this.roleMetadata.findRoleMetadata(entityRef);
+      if (entityRef.startsWith('role:default') && !roleMetadata) {
+        throw new Error(`Corresponding role ${entityRef} was not found`);
+      }
+
+      const user = await identity.getIdentity({ request });
+      const modifiedBy = user?.identity.userEntityRef!;
+      await this.enforcer.addPolicies(processedPolicies, 'rest', modifiedBy);
 
       response.status(201).end();
     });
@@ -312,10 +331,19 @@ export class PoliciesServer {
           'new policy',
         );
 
+        const roleMetadata =
+          await this.roleMetadata.findRoleMetadata(entityRef);
+        if (entityRef.startsWith('role:default') && !roleMetadata) {
+          throw new Error(`Corresponding role ${entityRef} was not found`);
+        }
+
+        const user = await identity.getIdentity({ request });
+        const modifiedBy = user?.identity.userEntityRef!;
         await this.enforcer.updatePolicies(
           processedOldPolicy,
           processedNewPolicy,
           'rest',
+          modifiedBy,
           false,
         );
 
@@ -374,11 +402,13 @@ export class PoliciesServer {
       );
 
       if (decision.result === AuthorizeResult.DENY) {
+        // todo
         throw new NotAllowedError(); // 403
       }
       const roleRaw: Role = request.body;
       const err = validateRole(roleRaw);
       if (err) {
+        // todo
         throw new InputError( // 400
           `Invalid role definition. Cause: ${err.message}`,
         );
@@ -391,6 +421,7 @@ export class PoliciesServer {
           (await this.enforcer.hasGroupingPolicy(...role)) &&
           !(await this.enforcer.hasFilteredPolicyMetadata(role, 'legacy'))
         ) {
+          // todo
           throw new ConflictError(); // 409
         }
         const roleString = JSON.stringify(role);
@@ -414,8 +445,19 @@ export class PoliciesServer {
         author: user?.identity.userEntityRef,
         modifiedBy: user?.identity.userEntityRef,
       };
+
       await this.enforcer.addGroupingPolicies(roles, metadata);
 
+      this.defAuditLog.auditLog({
+        message: 'Send response to report about created role',
+        eventName: RoleEvents.CreateRole.toString(),
+        stage: 'response',
+        request,
+        metadata: { roleEntityRef: metadata.roleEntityRef },
+        response: {
+          status: 201,
+        },
+      });
       response.status(201).end();
     });
 
@@ -548,6 +590,16 @@ export class PoliciesServer {
         newMetadata,
         false,
       );
+      this.defAuditLog.auditLog({
+        message: 'Send response to report about updated role',
+        eventName: RoleEvents.UpdateRole.toString(),
+        stage: 'response',
+        request,
+        metadata: { roleEntityRef },
+        response: {
+          status: 200,
+        },
+      });
 
       response.status(200).end();
     });
@@ -606,6 +658,16 @@ export class PoliciesServer {
           user?.identity.userEntityRef,
           false,
         );
+        this.defAuditLog.auditLog({
+          message: 'Send response to report about deleted role',
+          eventName: RoleEvents.DeleteRole.toString(),
+          stage: 'response',
+          request,
+          metadata: { roleEntityRef },
+          response: {
+            status: 200,
+          },
+        });
 
         response.status(204).end();
       },
@@ -689,8 +751,17 @@ export class PoliciesServer {
         pluginPermMetaData,
       );
 
-      const id =
-        await this.conditionalStorage.createCondition(conditionToCreate);
+      const user = await identity.getIdentity({ request });
+      // const actor: ActorDetails = {
+      //   actorId: user?.identity.userEntityRef!,
+      //   ip: request.ip,
+      //   hostname: request.hostname,
+      //   userAgent: request.get('user-agent'), // request url?
+      // };
+      const id = await this.conditionalStorage.createCondition(
+        conditionToCreate,
+        user!.identity.userEntityRef,
+      );
 
       response.status(201).json({ id: id });
     });
@@ -740,7 +811,17 @@ export class PoliciesServer {
         throw new InputError('Id is not a valid number.');
       }
 
-      await this.conditionalStorage.deleteCondition(id);
+      const user = await identity.getIdentity({ request });
+      // const actor: ActorDetails = {
+      // actorId: user?.identity.userEntityRef!,
+      // ip: request.ip,
+      // hostname: request.hostname,
+      // userAgent: request.get('user-agent'), // request url?
+      // };
+      await this.conditionalStorage.deleteCondition(
+        id,
+        user!.identity.userEntityRef,
+      );
       response.status(204).end();
     });
 
@@ -770,7 +851,12 @@ export class PoliciesServer {
         pluginPermMetaData,
       );
 
-      await this.conditionalStorage.updateCondition(id, conditionToUpdate);
+      const user = await identity.getIdentity({ request });
+      await this.conditionalStorage.updateCondition(
+        id,
+        conditionToUpdate,
+        user!.identity.userEntityRef,
+      );
       response.status(200).end();
     });
 

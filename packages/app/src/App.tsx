@@ -7,6 +7,11 @@ import {
   OAuthRequestDialog,
   SignInPage,
 } from '@backstage/core-components';
+import {
+  bitbucketAuthApiRef,
+  githubAuthApiRef,
+  microsoftAuthApiRef,
+} from '@backstage/core-plugin-api';
 import { apiDocsPlugin, ApiExplorerPage } from '@backstage/plugin-api-docs';
 import {
   CatalogEntityPage,
@@ -35,6 +40,9 @@ import { UserSettingsPage } from '@backstage/plugin-user-settings';
 import { TechRadarPage } from '@backstage-community/plugin-tech-radar';
 import { getThemes } from '@redhat-developer/red-hat-developer-hub-theme';
 
+// import { OcmPage } from '@janus-idp/backstage-plugin-ocm';
+import { RbacPage } from '@janus-idp/backstage-plugin-rbac';
+
 import { apis } from './apis';
 import { entityPage } from './components/catalog/EntityPage';
 import { Root } from './components/Root';
@@ -60,7 +68,32 @@ const app = createApp({
     });
   },
   components: {
-    SignInPage: props => <SignInPage {...props} auto providers={['guest']} />,
+    SignInPage: props => (
+      <SignInPage
+        {...props}
+        auto
+        providers={[
+          {
+            id: 'bitbucket-auth-provider',
+            title: 'Bitbucket',
+            message: 'Sign In using Bitbucket',
+            apiRef: bitbucketAuthApiRef,
+          },
+          {
+            id: 'github-auth-provider',
+            title: 'GitHub',
+            message: 'Sign in using GitHub',
+            apiRef: githubAuthApiRef,
+          },
+          {
+            id: 'microsoft-auth-provider',
+            title: 'Azure',
+            message: 'Sign in using Azure',
+            apiRef: microsoftAuthApiRef,
+          },
+        ]}
+      />
+    ),
   },
   themes: getThemes(),
 });
@@ -90,6 +123,7 @@ const routes = (
       path="/tech-radar"
       element={<TechRadarPage width={1500} height={800} />}
     />
+    <Route path="/rbac" element={<RbacPage />} />;
     <Route
       path="/catalog-import"
       element={

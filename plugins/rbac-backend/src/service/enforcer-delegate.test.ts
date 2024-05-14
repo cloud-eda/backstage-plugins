@@ -7,6 +7,7 @@ import { newEnforcer, newModelFromString } from 'casbin';
 import * as Knex from 'knex';
 import { MockClient } from 'knex-mock-client';
 
+import { DefaultAuditLogger } from '@janus-idp/backstage-plugin-audit-log-common';
 import {
   PermissionPolicyMetadata,
   Source,
@@ -68,6 +69,7 @@ const dbManagerMock: DatabaseService = {
   getClient: jest.fn().mockImplementation(),
 };
 
+const httpAuthServiceMock = mockServices.httpAuth();
 const mockAuthService = mockServices.auth();
 
 const config = new ConfigReader({
@@ -146,6 +148,11 @@ describe('EnforcerDelegate', () => {
   ): Promise<EnforcerDelegate> {
     const theModel = newModelFromString(MODEL);
     const logger = getVoidLogger();
+    const aLog = new DefaultAuditLogger({
+      authService: mockAuthService,
+      httpAuthService: httpAuthServiceMock,
+      logger,
+    });
 
     const sqliteInMemoryAdapter = await new CasbinDBAdapterFactory(
       config,
@@ -189,6 +196,7 @@ describe('EnforcerDelegate', () => {
       policyMetadataStorageMock,
       roleMetadataStorageMock,
       knex,
+      aLog,
     );
   }
 
@@ -319,7 +327,8 @@ describe('EnforcerDelegate', () => {
       const enfDelegate = await createEnfDelegate();
       enfAddPolicySpy.mockClear();
 
-      await enfDelegate.addPolicy(policy, 'rest');
+      const modifiedBy = `user:default/tom`;
+      await enfDelegate.addPolicy(policy, 'rest', modifiedBy);
 
       expect(
         policyMetadataStorageMock.createPolicyMetadata,
@@ -336,9 +345,10 @@ describe('EnforcerDelegate', () => {
           throw new Error('some unexpected error');
         });
 
-      await expect(enfDelegate.addPolicy(policy, 'rest')).rejects.toThrow(
-        'some unexpected error',
-      );
+      const modifiedBy = `user:default/tom`;
+      await expect(
+        enfDelegate.addPolicy(policy, 'rest', modifiedBy),
+      ).rejects.toThrow('some unexpected error');
     });
   });
 
@@ -346,7 +356,8 @@ describe('EnforcerDelegate', () => {
     it('should be added single policy', async () => {
       const enfDelegate = await createEnfDelegate();
 
-      await enfDelegate.addPolicies([policy], 'rest');
+      const modifiedBy = `user:default/tom`;
+      await enfDelegate.addPolicies([policy], 'rest', modifiedBy);
 
       const storePolicies = await enfDelegate.getPolicy();
 
@@ -359,7 +370,8 @@ describe('EnforcerDelegate', () => {
     it('should be added few policies', async () => {
       const enfDelegate = await createEnfDelegate();
 
-      await enfDelegate.addPolicies([policy, secondPolicy], 'rest');
+      const modifiedBy = `user:default/tom`;
+      await enfDelegate.addPolicies([policy, secondPolicy], 'rest', modifiedBy);
 
       const storePolicies = await enfDelegate.getPolicy();
 
@@ -391,14 +403,18 @@ describe('EnforcerDelegate', () => {
         });
 
       await expect(
-        enfDelegate.addPolicies([policy, secondPolicy], 'rest'),
+        enfDelegate.addPolicies(
+          [policy, secondPolicy],
+          'rest',
+          `user:default/tom`,
+        ),
       ).rejects.toThrow('some unexpected error');
     });
 
     it('should not fail, when argument is empty array', async () => {
       const enfDelegate = await createEnfDelegate();
 
-      enfDelegate.addPolicies([], 'rest');
+      enfDelegate.addPolicies([], 'rest', `user:default/tom`);
 
       expect(
         policyMetadataStorageMock.createPolicyMetadata,
@@ -932,7 +948,13 @@ describe('EnforcerDelegate', () => {
 
       const newPolicy = ['user:default/tom', 'policy-entity', 'read', 'deny'];
 
-      await enfDelegate.updatePolicies([policy], [newPolicy], 'rest');
+      const modifiedBy = `user:default/tom`;
+      await enfDelegate.updatePolicies(
+        [policy],
+        [newPolicy],
+        'rest',
+        modifiedBy,
+      );
 
       expect(
         policyMetadataStorageMock.removePolicyMetadata,
@@ -962,10 +984,12 @@ describe('EnforcerDelegate', () => {
         'allow',
       ];
 
+      const modifiedBy = `user:default/tom`;
       await enfDelegate.updatePolicies(
         [policy, secondPolicy],
         [newPolicy1, newPolicy2],
         'rest',
+        modifiedBy,
       );
 
       expect(
@@ -1003,7 +1027,8 @@ describe('EnforcerDelegate', () => {
         });
 
       const enfDelegate = await createEnfDelegate([policyToDelete]);
-      await enfDelegate.removePolicy(policyToDelete, 'rest', false);
+      const modifiedBy = `user:default/tom`;
+      await enfDelegate.removePolicy(policyToDelete, 'rest', modifiedBy, false);
 
       expect(
         policyMetadataStorageMock.findPolicyMetadata,
@@ -1020,8 +1045,9 @@ describe('EnforcerDelegate', () => {
         .mockImplementation();
 
       const enfDelegate = await createEnfDelegate([policyToDelete]);
+      const modifiedBy = `user:default/tom`;
       await expect(
-        enfDelegate.removePolicy(policyToDelete, 'rest', false),
+        enfDelegate.removePolicy(policyToDelete, 'rest', modifiedBy, false),
       ).rejects.toThrow(
         `A metadata for policy '${policyToString(
           policyToDelete,
@@ -1039,8 +1065,9 @@ describe('EnforcerDelegate', () => {
         });
 
       const enfDelegate = await createEnfDelegate([policyToDelete]);
+      const modifiedBy = `user:default/tom`;
       await expect(
-        enfDelegate.removePolicy(policyToDelete, 'rest', false),
+        enfDelegate.removePolicy(policyToDelete, 'rest', modifiedBy, false),
       ).rejects.toThrow(
         `Error: Attempted to modify an immutable pre-defined policy '${policyToString(
           policyToDelete,
@@ -1060,8 +1087,9 @@ describe('EnforcerDelegate', () => {
         });
 
       const enfDelegate = await createEnfDelegate([policyToDelete]);
+      const modifiedBy = `user:default/tom`;
       await expect(
-        enfDelegate.removePolicy(policyToDelete, 'rest', false),
+        enfDelegate.removePolicy(policyToDelete, 'rest', modifiedBy, false),
       ).rejects.toThrow(
         `policy '${policyToString(
           policyToDelete,
@@ -1069,7 +1097,7 @@ describe('EnforcerDelegate', () => {
       );
     });
 
-    it('should be removed even with source "csv-file", when corresponding flag is enabled', async () => {
+    it('should be removed policy even with source "csv-file", when corresponding flag is enabled', async () => {
       policyMetadataStorageMock.findPolicyMetadata = jest
         .fn()
         .mockImplementation(() => {
@@ -1079,7 +1107,14 @@ describe('EnforcerDelegate', () => {
         });
 
       const enfDelegate = await createEnfDelegate([policyToDelete]);
-      await enfDelegate.removePolicy(policyToDelete, 'rest', true);
+      const modifiedBy = `user:default/tom`;
+      await enfDelegate.removePolicy(
+        policyToDelete,
+        'rest',
+        modifiedBy,
+        false,
+        true,
+      );
 
       expect(
         policyMetadataStorageMock.findPolicyMetadata,
@@ -1106,7 +1141,13 @@ describe('EnforcerDelegate', () => {
         });
 
       const enfDelegate = await createEnfDelegate(policiesToDelete);
-      await enfDelegate.removePolicies(policiesToDelete, 'rest', false);
+      const modifiedBy = `user:default/tom`;
+      await enfDelegate.removePolicies(
+        policiesToDelete,
+        'rest',
+        modifiedBy,
+        false,
+      );
 
       expect(
         policyMetadataStorageMock.findPolicyMetadata,
@@ -1126,8 +1167,9 @@ describe('EnforcerDelegate', () => {
         .mockImplementation();
 
       const enfDelegate = await createEnfDelegate(policiesToDelete);
+      const modifiedBy = `user:default/tom`;
       await expect(
-        enfDelegate.removePolicies(policiesToDelete, 'rest', false),
+        enfDelegate.removePolicies(policiesToDelete, 'rest', modifiedBy, false),
       ).rejects.toThrow(
         `A metadata for policy '${policyToString(
           policiesToDelete[0],
@@ -1145,8 +1187,9 @@ describe('EnforcerDelegate', () => {
         });
 
       const enfDelegate = await createEnfDelegate(policiesToDelete);
+      const modifiedBy = `user:default/tom`;
       await expect(
-        enfDelegate.removePolicies(policiesToDelete, 'rest', false),
+        enfDelegate.removePolicies(policiesToDelete, 'rest', modifiedBy, false),
       ).rejects.toThrow(
         `Error: Attempted to modify an immutable pre-defined policy '${policyToString(
           policiesToDelete[0],
@@ -1166,8 +1209,9 @@ describe('EnforcerDelegate', () => {
         });
 
       const enfDelegate = await createEnfDelegate(policiesToDelete);
+      const modifiedBy = `user:default/tom`;
       await expect(
-        enfDelegate.removePolicies(policiesToDelete, 'rest', false),
+        enfDelegate.removePolicies(policiesToDelete, 'rest', modifiedBy, false),
       ).rejects.toThrow(
         `policy '${policyToString(
           policiesToDelete[0],
@@ -1175,7 +1219,7 @@ describe('EnforcerDelegate', () => {
       );
     });
 
-    it('should be removed even with source "csv-file", when corresponding flag is enabled', async () => {
+    it('should be removed policies even with source "csv-file", when corresponding flag is enabled', async () => {
       policyMetadataStorageMock.findPolicyMetadata = jest
         .fn()
         .mockImplementation(() => {
@@ -1185,7 +1229,14 @@ describe('EnforcerDelegate', () => {
         });
 
       const enfDelegate = await createEnfDelegate(policiesToDelete);
-      await enfDelegate.removePolicies(policiesToDelete, 'rest', true);
+      const modifiedBy = `user:default/tom`;
+      await enfDelegate.removePolicies(
+        policiesToDelete,
+        'rest',
+        modifiedBy,
+        false,
+        true,
+      );
 
       expect(
         policyMetadataStorageMock.findPolicyMetadata,
@@ -1224,9 +1275,10 @@ describe('EnforcerDelegate', () => {
         });
 
       const enfDelegate = await createEnfDelegate([], [groupingPolicyToDelete]);
+      const modifiedBy = `user:default/tom`;
       await enfDelegate.removeGroupingPolicy(
         groupingPolicyToDelete,
-        { source: 'rest', roleEntityRef: 'role:default/team-dev' },
+        { source: 'rest', roleEntityRef: 'role:default/team-dev', modifiedBy },
         false,
       );
 
@@ -1275,9 +1327,10 @@ describe('EnforcerDelegate', () => {
           ['group:default/team-a', 'role:default/team-dev'],
         ],
       );
+      const modifiedBy = `user:default/tom`;
       await enfDelegate.removeGroupingPolicy(
         groupingPolicyToDelete,
-        { source: 'rest', roleEntityRef: 'role:default/team-dev' },
+        { source: 'rest', roleEntityRef: 'role:default/team-dev', modifiedBy },
         false,
       );
 
@@ -1421,11 +1474,12 @@ describe('EnforcerDelegate', () => {
             source: 'csv-file',
           };
         });
+      const modifiedBy = `user:default/tom`;
 
       const enfDelegate = await createEnfDelegate([], [groupingPolicyToDelete]);
       await enfDelegate.removeGroupingPolicy(
         groupingPolicyToDelete,
-        { source: 'rest', roleEntityRef: 'role:default/team-dev' },
+        { source: 'rest', roleEntityRef: 'role:default/team-dev', modifiedBy },
         false,
         true,
       );
@@ -1505,7 +1559,7 @@ describe('EnforcerDelegate', () => {
       );
     });
 
-    it('should remove grouping policy and update role metadata', async () => {
+    it('should remove grouping policies and update role metadata', async () => {
       policyMetadataStorageMock.findPolicyMetadata = jest
         .fn()
         .mockImplementation(() => {
@@ -1740,7 +1794,8 @@ describe('EnforcerDelegate', () => {
       const enfDelegate = await createEnfDelegate([]);
       enfAddPolicySpy.mockClear();
 
-      await enfDelegate.addOrUpdatePolicy(policy, 'rest', false);
+      const modifiedBy = `user:default/tom`;
+      await enfDelegate.addOrUpdatePolicy(policy, 'rest', modifiedBy, false);
 
       expect(
         policyMetadataStorageMock.createPolicyMetadata,
@@ -1759,7 +1814,8 @@ describe('EnforcerDelegate', () => {
       const enfDelegate = await createEnfDelegate([policy]);
       enfAddPolicySpy.mockClear();
 
-      await enfDelegate.addOrUpdatePolicy(policy, 'rest', false);
+      const modifiedBy = `user:default/tom`;
+      await enfDelegate.addOrUpdatePolicy(policy, 'rest', modifiedBy, false);
 
       expect(
         policyMetadataStorageMock.removePolicyMetadata,

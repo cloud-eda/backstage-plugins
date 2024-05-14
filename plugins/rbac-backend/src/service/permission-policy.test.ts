@@ -22,6 +22,7 @@ import * as Knex from 'knex';
 import { MockClient } from 'knex-mock-client';
 import { Logger } from 'winston';
 
+import { DefaultAuditLogger } from '@janus-idp/backstage-plugin-audit-log-common';
 import {
   PermissionPolicyMetadata,
   RoleMetadata,
@@ -122,6 +123,7 @@ const csvPermFile = resolve(
 
 const knex = Knex.knex({ client: MockClient });
 
+const mockHttpAuth = mockServices.httpAuth();
 const mockAuthService = mockServices.auth();
 
 describe('RBACPermissionPolicy Tests', () => {
@@ -1233,9 +1235,11 @@ describe('Policy checks for resourced permissions defined by name', () => {
       ['user:default/tor', 'role:default/catalog_reader'],
       { source: 'csv-file', roleEntityRef: 'role:default/catalog_reader' },
     );
+    const modifiedBy = `user:default/tom`;
     await enfDelegate.addPolicy(
       ['role:default/catalog_reader', 'catalog.entity.read', 'read', 'allow'],
       'csv-file',
+      modifiedBy,
     );
 
     const decision = await policy.handle(
@@ -1256,12 +1260,14 @@ describe('Policy checks for resourced permissions defined by name', () => {
       ['user:default/tor', 'role:default/catalog_reader'],
       { source: 'csv-file', roleEntityRef: 'role:default/catalog_reader' },
     );
+    const modifiedBy = `user:default/tom`;
     await enfDelegate.addPolicies(
       [
         ['role:default/catalog_reader', 'catalog.entity.read', 'read', 'allow'],
         ['role:default/catalog_reader', 'catalog-entity', 'read', 'deny'],
       ],
       'csv-file',
+      modifiedBy,
     );
 
     const decision = await policy.handle(
@@ -1282,12 +1288,14 @@ describe('Policy checks for resourced permissions defined by name', () => {
       ['user:default/tor', 'role:default/catalog_reader'],
       { source: 'csv-file', roleEntityRef: 'role:default/catalog_reader' },
     );
+    const modifiedBy = `user:default/tom`;
     await enfDelegate.addPolicies(
       [
         ['role:default/catalog_reader', 'catalog.entity.read', 'read', 'deny'],
         ['role:default/catalog_reader', 'catalog-entity', 'read', 'allow'],
       ],
       'csv-file',
+      modifiedBy,
     );
 
     const decision = await policy.handle(
@@ -1321,9 +1329,11 @@ describe('Policy checks for resourced permissions defined by name', () => {
       ['group:default/team-a', 'role:default/catalog_user'],
       { source: 'csv-file', roleEntityRef: 'role:default/catalog_user' },
     );
+    const modifiedBy = `user:default/tom`;
     await enfDelegate.addPolicies(
       [['role:default/catalog_user', 'catalog.entity.read', 'read', 'allow']],
       'csv-file',
+      modifiedBy,
     );
 
     const decision = await policy.handle(
@@ -1370,9 +1380,11 @@ describe('Policy checks for resourced permissions defined by name', () => {
       ['group:default/team-a', 'group:default/team-b'],
       { source: 'csv-file', roleEntityRef: 'role:default/catalog_user' },
     );
+    const modifiedBy = `user:default/tom`;
     await enfDelegate.addPolicies(
       [['role:default/catalog_user', 'catalog.entity.read', 'read', 'allow']],
       'csv-file',
+      modifiedBy,
     );
 
     const decision = await policy.handle(
@@ -1785,15 +1797,22 @@ describe('Policy checks for conditional policies', () => {
     const logger = getVoidLogger();
     const enf = await createEnforcer(theModel, adapter, logger, config);
 
+    const aLog = new DefaultAuditLogger({
+      authService: mockAuthService,
+      httpAuthService: mockHttpAuth,
+      logger,
+    });
     const enfDelegate = new EnforcerDelegate(
       enf,
       policyMetadataStorageMock,
       roleMetadataStorageMock,
       knex,
+      aLog,
     );
 
     policy = await RBACPermissionPolicy.build(
       logger,
+      aLog,
       config,
       conditionalStorage,
       enfDelegate,
@@ -2131,6 +2150,11 @@ async function newEnforcerDelegate(
 ): Promise<EnforcerDelegate> {
   const theModel = newModelFromString(MODEL);
   const logger = getVoidLogger();
+  const aLog = new DefaultAuditLogger({
+    authService: mockAuthService,
+    httpAuthService: mockHttpAuth,
+    logger,
+  });
 
   const enf = await createEnforcer(theModel, adapter, logger, config);
 
@@ -2147,6 +2171,7 @@ async function newEnforcerDelegate(
     policyMock || policyMetadataStorageMock,
     roleMetadataStorageMock,
     knex,
+    aLog,
   );
 }
 
@@ -2156,8 +2181,14 @@ async function newPermissionPolicy(
   roleMock?: RoleMetadataStorage,
 ): Promise<RBACPermissionPolicy> {
   const logger = getVoidLogger();
+  const aLog = new DefaultAuditLogger({
+    authService: mockAuthService,
+    httpAuthService: mockHttpAuth,
+    logger,
+  });
   return await RBACPermissionPolicy.build(
     logger,
+    aLog,
     config,
     conditionalStorage,
     enfDelegate,

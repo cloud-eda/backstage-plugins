@@ -3,11 +3,14 @@ import { ConfigApi } from '@backstage/core-plugin-api';
 import { BackstageIdentityResponse } from '@backstage/plugin-auth-node';
 import {
   AuthorizeResult,
+  ConditionalPolicyDecision,
   isResourcePermission,
+  Permission,
   PermissionCondition,
   PermissionCriteria,
   PermissionRuleParams,
   PolicyDecision,
+  ResourcePermission,
 } from '@backstage/plugin-permission-common';
 import {
   PermissionPolicy,
@@ -17,9 +20,10 @@ import {
 import { Knex } from 'knex';
 import { Logger } from 'winston';
 
+import { AuditLogger } from '@janus-idp/backstage-plugin-audit-log-common';
 import {
   NonEmptyArray,
-  PermissionAction,
+  toPermissionAction,
 } from '@janus-idp/backstage-plugin-rbac-common';
 
 import { ConditionalStorage } from '../database/conditional-storage';
@@ -120,7 +124,12 @@ const setAdminPermissions = async (enf: EnforcerDelegate) => {
     'read',
     'allow',
   ];
-  await enf.addOrUpdatePolicy(adminReadPermission, 'configuration', false);
+  await enf.addOrUpdatePolicy(
+    adminReadPermission,
+    'configuration',
+    ADMIN_ROLE_AUTHOR,
+    false,
+  );
 
   const adminCreatePermission = [
     ADMIN_ROLE_NAME,
@@ -128,7 +137,12 @@ const setAdminPermissions = async (enf: EnforcerDelegate) => {
     'create',
     'allow',
   ];
-  await enf.addOrUpdatePolicy(adminCreatePermission, 'configuration', false);
+  await enf.addOrUpdatePolicy(
+    adminCreatePermission,
+    'configuration',
+    ADMIN_ROLE_AUTHOR,
+    false,
+  );
 
   const adminDeletePermission = [
     ADMIN_ROLE_NAME,
@@ -136,7 +150,12 @@ const setAdminPermissions = async (enf: EnforcerDelegate) => {
     'delete',
     'allow',
   ];
-  await enf.addOrUpdatePolicy(adminDeletePermission, 'configuration', false);
+  await enf.addOrUpdatePolicy(
+    adminDeletePermission,
+    'configuration',
+    ADMIN_ROLE_AUTHOR,
+    false,
+  );
 
   const adminUpdatePermission = [
     ADMIN_ROLE_NAME,
@@ -144,7 +163,12 @@ const setAdminPermissions = async (enf: EnforcerDelegate) => {
     'update',
     'allow',
   ];
-  await enf.addOrUpdatePolicy(adminUpdatePermission, 'configuration', false);
+  await enf.addOrUpdatePolicy(
+    adminUpdatePermission,
+    'configuration',
+    ADMIN_ROLE_AUTHOR,
+    false,
+  );
 
   // needed for rbac frontend.
   const adminCatalogReadPermission = [
@@ -156,18 +180,32 @@ const setAdminPermissions = async (enf: EnforcerDelegate) => {
   await enf.addOrUpdatePolicy(
     adminCatalogReadPermission,
     'configuration',
+    ADMIN_ROLE_AUTHOR,
     false,
   );
 };
 
+// const evaluatePermMsg = (
+//   userEntityRef: string | undefined,
+//   result: AuthorizeResult,
+//   permission: Permission,
+// ) =>
+//   `${userEntityRef} is ${result} for permission '${permission.name}'${
+//     isResourcePermission(permission)
+//       ? `, resource type '${permission.resourceType}'`
+//       : ''
+//   } and action '${toPermissionAction(permission.attributes)}'`;
+
 export class RBACPermissionPolicy implements PermissionPolicy {
   private readonly enforcer: EnforcerDelegate;
   private readonly logger: Logger;
+  private readonly aLog: AuditLogger;
   private readonly conditionStorage: ConditionalStorage;
   private readonly superUserList?: string[];
 
   public static async build(
     logger: Logger,
+    aLog: AuditLogger,
     configApi: ConfigApi,
     conditionalStorage: ConditionalStorage,
     enforcerDelegate: EnforcerDelegate,
@@ -224,6 +262,7 @@ export class RBACPermissionPolicy implements PermissionPolicy {
     return new RBACPermissionPolicy(
       enforcerDelegate,
       logger,
+      aLog,
       conditionalStorage,
       superUserList,
     );
@@ -232,11 +271,13 @@ export class RBACPermissionPolicy implements PermissionPolicy {
   private constructor(
     enforcer: EnforcerDelegate,
     logger: Logger,
+    aLog: AuditLogger,
     conditionStorage: ConditionalStorage,
     superUserList?: string[],
   ) {
     this.enforcer = enforcer;
     this.logger = logger;
+    this.aLog = aLog;
     this.conditionStorage = conditionStorage;
     this.superUserList = superUserList;
   }
@@ -245,21 +286,36 @@ export class RBACPermissionPolicy implements PermissionPolicy {
     request: PolicyQuery,
     identityResp?: BackstageIdentityResponse | undefined,
   ): Promise<PolicyDecision> {
-    this.logger.info(
-      `Policy check for ${identityResp?.identity.userEntityRef} for permission ${request.permission.name}`,
-    );
+    const userEntityRef =
+      identityResp?.identity.userEntityRef ?? `user without entity`;
+
+    // this.aLog.logEvaluation(
+    //   'info',
+    //   `Policy check for ${userEntityRef}`,
+    //   userEntityRef,
+    //   request,
+    // );
+
     try {
       let status = false;
 
-      // We are introducing an action named "use" when action does not exist to avoid
-      // a more complicated model with multiple policy and request shapes.
-      const action = request.permission.attributes.action ?? 'use';
-
+      const action = toPermissionAction(request.permission.attributes);
       if (!identityResp?.identity) {
+        // const msg = evaluatePermMsg(
+        //   userEntityRef,
+        //   AuthorizeResult.DENY,
+        //   request.permission,
+        // );
+        // this.aLog.logEvaluation(
+        //   'info',
+        //   msg,
+        //   userEntityRef,
+        //   request,
+        //   AuthorizeResult.DENY,
+        // );
         return { result: AuthorizeResult.DENY };
       }
 
-      const userEntityRef = identityResp.identity.userEntityRef;
       const permissionName = request.permission.name;
       const roles = await this.enforcer.getRolesForUser(userEntityRef);
 
@@ -270,9 +326,7 @@ export class RBACPermissionPolicy implements PermissionPolicy {
         if (identityResp) {
           const conditionResult = await this.handleConditions(
             userEntityRef,
-            resourceType,
-            request.permission.name,
-            action,
+            request,
             roles,
           );
           if (conditionResult) {
@@ -302,23 +356,18 @@ export class RBACPermissionPolicy implements PermissionPolicy {
       }
 
       const result = status ? AuthorizeResult.ALLOW : AuthorizeResult.DENY;
-      this.logger.info(
-        `${userEntityRef} is ${result} for permission '${
-          request.permission.name
-        }'${
-          isResourcePermission(request.permission)
-            ? `, resource type '${request.permission.resourceType}'`
-            : ''
-        } and action ${action}`,
-      );
-      return Promise.resolve({
-        result: result,
-      });
+      // const msg = evaluatePermMsg(userEntityRef, result, request.permission);
+      // this.aLog.logEvaluation('info', msg, userEntityRef, request, result);
+      return { result };
     } catch (error) {
-      this.logger.error(`Policy check failed with ${error}`);
-      return Promise.resolve({
-        result: AuthorizeResult.DENY,
-      });
+      // this.aLog.logEvaluation(
+      //   'error',
+      //   `Policy check failed with ${error}`,
+      //   userEntityRef,
+      //   request,
+      //   AuthorizeResult.DENY,
+      // );
+      return { result: AuthorizeResult.DENY };
     }
   }
 
@@ -351,12 +400,15 @@ export class RBACPermissionPolicy implements PermissionPolicy {
   };
 
   private async handleConditions(
-    userEntityRef: string,
-    resourceType: string,
-    permissionName: string,
-    action: PermissionAction,
+    _userEntityRef: string,
+    request: PolicyQuery,
     roles: string[],
   ): Promise<PolicyDecision | undefined> {
+    const permissionName = request.permission.name;
+    const resourceType = (request.permission as ResourcePermission)
+      .resourceType;
+    const action = toPermissionAction(request.permission.attributes);
+
     const conditions: PermissionCriteria<
       PermissionCondition<string, PermissionRuleParams>
     >[] = [];
@@ -377,9 +429,16 @@ export class RBACPermissionPolicy implements PermissionPolicy {
 
       // this error is unexpected and should not happen, but just in case handle it.
       if (conditionalDecisions.length > 1) {
-        this.logger.error(
-          `Detected ${conditionalDecisions.length} collisions for conditional policies. Expected to find a stored single condition for permission with name ${permissionName}, resource type ${resourceType}, action ${action} for user ${userEntityRef}`,
-        );
+        // const msg = `Detected ${JSON.stringify(
+        //   conditionalDecisions,
+        // )} collisions for conditional policies. Expected to find a stored single condition for permission with name ${permissionName}, resource type ${resourceType}, action ${action} for user ${userEntityRef}`;
+        // this.aLog.logEvaluation(
+        //   'error',
+        //   msg,
+        //   userEntityRef,
+        //   request,
+        //   AuthorizeResult.DENY,
+        // );
         return {
           result: AuthorizeResult.DENY,
         };
@@ -387,10 +446,7 @@ export class RBACPermissionPolicy implements PermissionPolicy {
     }
 
     if (conditions.length > 0) {
-      this.logger.info(
-        `${userEntityRef} executed condition for permission ${permissionName}, resource type ${resourceType} and action ${action}`,
-      );
-      return {
+      const result: ConditionalPolicyDecision = {
         pluginId,
         result: AuthorizeResult.CONDITIONAL,
         resourceType,
@@ -402,6 +458,16 @@ export class RBACPermissionPolicy implements PermissionPolicy {
           >,
         },
       };
+      // const msg = `Send condition to plugin with id ${pluginId} to evaluate permission ${permissionName} with resource type ${resourceType} and action ${action} for user ${userEntityRef}`;
+      // this.aLog.logEvaluation(
+      //   'info',
+      //   msg,
+      //   userEntityRef,
+      //   request,
+      //   result.result,
+      //   result,
+      // );
+      return result;
     }
     return undefined;
   }

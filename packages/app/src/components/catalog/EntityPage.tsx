@@ -1,4 +1,5 @@
 import {
+  Entity,
   RELATION_API_CONSUMED_BY,
   RELATION_API_PROVIDED_BY,
   RELATION_CONSUMES_API,
@@ -55,8 +56,13 @@ import {
   EntityGithubActionsContent,
   isGithubActionsAvailable,
 } from '@backstage-community/plugin-github-actions';
-import Button from '@mui/material/Button';
-import Grid from '@mui/material/Grid';
+import { Button, Grid } from '@material-ui/core';
+
+import {
+  ClusterAvailableResourceCard,
+  ClusterContextProvider,
+  ClusterInfoCard,
+} from '@janus-idp/backstage-plugin-ocm';
 
 const techdocsContent = (
   <EntityTechdocsContent>
@@ -140,6 +146,15 @@ const overviewContent = (
   </Grid>
 );
 
+const isType = (types: string | string[]) => (entity: Entity) => {
+  if (!entity?.spec?.type) {
+    return false;
+  }
+  return typeof types === 'string'
+    ? entity?.spec?.type === types
+    : types.includes(entity.spec.type as string);
+};
+
 const serviceEntityPage = (
   <EntityLayout>
     <EntityLayout.Route path="/" title="Overview">
@@ -159,21 +174,6 @@ const serviceEntityPage = (
           <EntityConsumedApisCard />
         </Grid>
       </Grid>
-    </EntityLayout.Route>
-
-    <EntityLayout.Route path="/dependencies" title="Dependencies">
-      <Grid container spacing={3} alignItems="stretch">
-        <Grid item md={6}>
-          <EntityDependsOnComponentsCard variant="gridItem" />
-        </Grid>
-        <Grid item md={6}>
-          <EntityDependsOnResourcesCard variant="gridItem" />
-        </Grid>
-      </Grid>
-    </EntityLayout.Route>
-
-    <EntityLayout.Route path="/docs" title="Docs">
-      {techdocsContent}
     </EntityLayout.Route>
   </EntityLayout>
 );
@@ -377,6 +377,41 @@ const domainPage = (
   </EntityLayout>
 );
 
+const resourcePage = (
+  <EntityLayout>
+    <EntityLayout.Route path="/status" title="status">
+      <EntitySwitch>
+        <EntitySwitch.Case if={isType('kubernetes-cluster')}>
+          <ClusterContextProvider>
+            <Grid container direction="column" xs={6}>
+              <Grid item>
+                <ClusterInfoCard />
+              </Grid>
+              <Grid item>
+                <ClusterAvailableResourceCard />
+              </Grid>
+            </Grid>
+          </ClusterContextProvider>
+        </EntitySwitch.Case>
+      </EntitySwitch>
+    </EntityLayout.Route>
+    <EntityLayout.Route path="/dependencies" title="Dependencies">
+      <Grid container spacing={3} alignItems="stretch">
+        <Grid item md={6}>
+          <EntityDependsOnComponentsCard variant="gridItem" />
+        </Grid>
+        <Grid item md={6}>
+          <EntityDependsOnResourcesCard variant="gridItem" />
+        </Grid>
+      </Grid>
+    </EntityLayout.Route>
+
+    <EntityLayout.Route path="/docs" title="Docs">
+      {techdocsContent}
+    </EntityLayout.Route>
+  </EntityLayout>
+);
+
 export const entityPage: React.JSX.Element = (
   <EntitySwitch>
     <EntitySwitch.Case if={isKind('component')} children={componentPage} />
@@ -385,7 +420,7 @@ export const entityPage: React.JSX.Element = (
     <EntitySwitch.Case if={isKind('user')} children={userPage} />
     <EntitySwitch.Case if={isKind('system')} children={systemPage} />
     <EntitySwitch.Case if={isKind('domain')} children={domainPage} />
-
+    {/* <EntitySwitch.Case if={isKind('resource')} children={resourcePage} /> */}
     <EntitySwitch.Case>{defaultEntityPage}</EntitySwitch.Case>
   </EntitySwitch>
 );

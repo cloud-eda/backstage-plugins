@@ -3,11 +3,18 @@ import { NotAllowedError, NotFoundError } from '@backstage/errors';
 import { Enforcer, newModelFromString } from 'casbin';
 import { Knex } from 'knex';
 
+import { AuditLogger } from '@janus-idp/backstage-plugin-audit-log-common';
 import {
   PermissionPolicyMetadata,
   Source,
 } from '@janus-idp/backstage-plugin-rbac-common';
 
+import {
+  Operation,
+  RoleAuditInfo,
+  RoleDiff,
+  RoleEvents,
+} from '../audit-log/audit-logger';
 import {
   PermissionPolicyMetadataDao,
   PolicyMetadataStorage,
@@ -16,7 +23,7 @@ import {
   RoleMetadataDao,
   RoleMetadataStorage,
 } from '../database/role-metadata';
-import { policiesToString, policyToString } from '../helper';
+import { membersDiff, policiesToString, policyToString } from '../helper';
 import { MODEL } from './permission-model';
 import { ADMIN_ROLE_NAME } from './permission-policy';
 
@@ -26,6 +33,7 @@ export class EnforcerDelegate {
     private readonly policyMetadataStorage: PolicyMetadataStorage,
     private readonly roleMetadataStorage: RoleMetadataStorage,
     private readonly knex: Knex,
+    private readonly auditDefLog: AuditLogger,
   ) {}
 
   async hasPolicy(...policy: string[]): Promise<boolean> {
@@ -65,6 +73,7 @@ export class EnforcerDelegate {
   async addPolicy(
     policy: string[],
     source: Source,
+    modifiedBy: string,
     externalTrx?: Knex.Transaction,
   ): Promise<void> {
     const trx = externalTrx ?? (await this.knex.transaction());
@@ -81,11 +90,20 @@ export class EnforcerDelegate {
       }
       if (!externalTrx) {
         await trx.commit();
+        // this.aLog.permissionInfo([policy], 'CREATE', source, modifiedBy);
       }
     } catch (err) {
       if (!externalTrx) {
         await trx.rollback(err);
+        // this.aLog.permissionError(
+        //   [policy],
+        //   ['CREATE'],
+        //   source,
+        //   modifiedBy,
+        //   err,
+        // );
       }
+
       throw err;
     }
   }
@@ -93,6 +111,7 @@ export class EnforcerDelegate {
   async addPolicies(
     policies: string[][],
     source: Source,
+    modifiedBy: string,
     externalTrx?: Knex.Transaction,
   ): Promise<void> {
     const trx = externalTrx || (await this.knex.transaction());
@@ -112,10 +131,18 @@ export class EnforcerDelegate {
       }
       if (!externalTrx) {
         await trx.commit();
+        // this.aLog.permissionInfo(policies, 'CREATE', source, modifiedBy);
       }
     } catch (err) {
       if (!externalTrx) {
         await trx.rollback(err);
+        // this.aLog.permissionError(
+        //   policies,
+        //   ['CREATE'],
+        //   source,
+        //   modifiedBy,
+        //   err,
+        // );
       }
       throw err;
     }
@@ -129,6 +156,7 @@ export class EnforcerDelegate {
     const trx = externalTrx ?? (await this.knex.transaction());
     const entityRef = roleMetadata.roleEntityRef;
 
+    let operation: Operation | undefined;
     try {
       await this.policyMetadataStorage.createPolicyMetadata(
         roleMetadata.source,
@@ -145,12 +173,14 @@ export class EnforcerDelegate {
       }
 
       if (currentMetadata) {
+        operation = 'UPDATE';
         await this.roleMetadataStorage.updateRoleMetadata(
           this.mergeMetadata(currentMetadata, roleMetadata),
           entityRef,
           trx,
         );
       } else {
+        operation = 'CREATE';
         const currentDate: Date = new Date();
         roleMetadata.createdAt = currentDate.toUTCString();
         roleMetadata.lastModified = currentDate.toUTCString();
@@ -163,10 +193,47 @@ export class EnforcerDelegate {
       }
       if (!externalTrx) {
         await trx.commit();
+
+        const diff: RoleDiff = {
+          addedMembers: [policy[0]],
+        };
+        const metadata: RoleAuditInfo = {
+          roleEntityRef: roleMetadata.roleEntityRef,
+          source: roleMetadata.source,
+          operation,
+          roleDescription: roleMetadata.description,
+          members: policy.map(p => p[0]),
+          diff,
+        };
+        const message =
+          operation === 'CREATE'
+            ? `Created ${roleMetadata.roleEntityRef}}`
+            : `Updated ${roleMetadata.roleEntityRef}}`;
+        const eventName =
+          operation === 'CREATE'
+            ? RoleEvents.CreateRole
+            : RoleEvents.UpdateRole;
+        await this.auditDefLog.auditLog({
+          message: message,
+          eventName: `${eventName.toString()}`,
+          stage: 'metadata',
+          metadata,
+          actor_id: roleMetadata.roleEntityRef,
+        });
+
+        // this.aLog.roleInfo(roleMetadata, actor, context, operation, [policy[0]]);
       }
     } catch (err) {
       if (!externalTrx) {
         await trx.rollback(err);
+
+        // this.aLog.roleError(
+        //   roleMetadata.roleEntityRef,
+        //   operation ? [operation] : ['CREATE', 'UPDATE'],
+        //   err,
+        //   roleMetadata.source,
+        //   roleMetadata.modifiedBy,
+        // );
       }
       throw err;
     }
@@ -178,7 +245,7 @@ export class EnforcerDelegate {
     externalTrx?: Knex.Transaction,
   ): Promise<void> {
     const trx = externalTrx ?? (await this.knex.transaction());
-
+    let operation: Operation | undefined;
     try {
       for (const policy of policies) {
         await this.policyMetadataStorage.createPolicyMetadata(
@@ -194,12 +261,14 @@ export class EnforcerDelegate {
           trx,
         );
       if (currentRoleMetadata) {
+        operation = 'UPDATE';
         await this.roleMetadataStorage.updateRoleMetadata(
           this.mergeMetadata(currentRoleMetadata, roleMetadata),
           roleMetadata.roleEntityRef,
           trx,
         );
       } else {
+        operation = 'CREATE';
         const currentDate: Date = new Date();
         roleMetadata.createdAt = currentDate.toUTCString();
         roleMetadata.lastModified = currentDate.toUTCString();
@@ -215,11 +284,55 @@ export class EnforcerDelegate {
 
       if (!externalTrx) {
         await trx.commit();
+
+        const diff: RoleDiff = {
+          addedMembers: policies.map(p => p[0]),
+        };
+        const metadata: RoleAuditInfo = {
+          roleEntityRef: roleMetadata.roleEntityRef,
+          source: roleMetadata.source,
+          operation,
+          roleDescription: roleMetadata.description,
+          members: policies.map(p => p[0]),
+          diff,
+        };
+        const message =
+          operation === 'CREATE'
+            ? `Created ${roleMetadata.roleEntityRef}`
+            : `Updated ${roleMetadata.roleEntityRef}`;
+        const eventName =
+          operation === 'CREATE'
+            ? RoleEvents.CreateRole
+            : RoleEvents.UpdateRole;
+        await this.auditDefLog.auditLog({
+          message,
+          eventName: `${eventName.toString()}`,
+          stage: 'metadata',
+          metadata,
+          actor_id: roleMetadata.roleEntityRef,
+        });
+        // console.log(`===========`);
+        //   this.aLog.roleInfo(
+        //     roleMetadata,
+        //     actor,
+        //     roleMetadata.source,
+        //     operation,
+        //     policies.map(p => p[0]),
+        //   );
       }
     } catch (err) {
       if (!externalTrx) {
         await trx.rollback(err);
+
+        // this.aLog.roleError(
+        //   roleMetadata.roleEntityRef,
+        //   operation ? [operation] : ['CREATE', 'UPDATE'],
+        //   err,
+        //   roleMetadata.source,
+        //   roleMetadata.modifiedBy,
+        // );
       }
+
       throw err;
     }
   }
@@ -229,9 +342,8 @@ export class EnforcerDelegate {
     newRole: string[][],
     newRoleMetadata: RoleMetadataDao,
     allowToDeleteCSVFilePolicy?: boolean,
-    externalTrx?: Knex.Transaction,
   ): Promise<void> {
-    const trx = externalTrx ?? (await this.knex.transaction());
+    const trx = await this.knex.transaction();
     const oldRoleName = oldRole.at(0)?.at(1)!;
     try {
       const currentMetadata = await this.roleMetadataStorage.findRoleMetadata(
@@ -251,13 +363,45 @@ export class EnforcerDelegate {
         trx,
       );
       await this.addGroupingPolicies(newRole, newRoleMetadata, trx);
-      if (!externalTrx) {
-        await trx.commit();
-      }
+
+      await trx.commit();
+
+      const { addedMembers, removedMembers } = membersDiff(
+        oldRole.map(r => r[0]),
+        newRole.map(r => r[0]),
+      );
+      const diff: RoleDiff = {
+        isDescriptionChanged:
+          currentMetadata.description !== newRoleMetadata.description,
+        addedMembers,
+        removedMembers,
+      };
+      const metadata: RoleAuditInfo = {
+        roleEntityRef: newRoleMetadata.roleEntityRef,
+        source: newRoleMetadata.source,
+        operation: 'UPDATE',
+        roleDescription: newRoleMetadata.description,
+        members: newRole.map(gp => gp[0]),
+        diff,
+      };
+
+      await this.auditDefLog.auditLog({
+        message: `Updated ${newRoleMetadata.roleEntityRef}`,
+        eventName: RoleEvents.UpdateRole.toString(),
+        stage: 'metadata',
+        metadata,
+        actor_id: newRoleMetadata.modifiedBy,
+      });
     } catch (err) {
-      if (!externalTrx) {
-        await trx.rollback(err);
-      }
+      await trx.rollback(err);
+
+      // this.aLog.roleError(
+      //   newRoleMetadata.roleEntityRef,
+      //   ['UPDATE'],
+      //   err,
+      //   newRoleMetadata.source,
+      //   newRoleMetadata.modifiedBy,
+      // );
       throw err;
     }
   }
@@ -266,26 +410,39 @@ export class EnforcerDelegate {
     oldPolicies: string[][],
     newPolicies: string[][],
     source: Source,
+    modifiedBy: string,
     allowToDeleteCSVFilePolicy?: boolean,
-    externalTrx?: Knex.Transaction,
   ): Promise<void> {
-    const trx = externalTrx ?? (await this.knex.transaction());
+    const trx = await this.knex.transaction();
 
     try {
       await this.removePolicies(
         oldPolicies,
         source,
+        modifiedBy,
+        true,
         allowToDeleteCSVFilePolicy,
         trx,
       );
-      await this.addPolicies(newPolicies, source, trx);
-      if (!externalTrx) {
-        await trx.commit();
-      }
+      await this.addPolicies(newPolicies, source, modifiedBy, trx);
+      await trx.commit();
+
+      // this.aLog.permissionInfo(
+      //   newPolicies,
+      //   'UPDATE',
+      //   source,
+      //   modifiedBy,
+      //   oldPolicies,
+      // );
     } catch (err) {
-      if (!externalTrx) {
-        await trx.rollback(err);
-      }
+      await trx.rollback(err);
+      // this.aLog.permissionError(
+      //   newPolicies,
+      //   ['UPDATE'],
+      //   source,
+      //   modifiedBy,
+      //   err,
+      // );
       throw err;
     }
   }
@@ -293,6 +450,8 @@ export class EnforcerDelegate {
   async removePolicy(
     policy: string[],
     source: Source,
+    modifiedBy: string,
+    isUpdate?: boolean,
     allowToDeleteCSVFilePolicy?: boolean,
     externalTrx?: Knex.Transaction,
   ) {
@@ -313,9 +472,21 @@ export class EnforcerDelegate {
       if (!externalTrx) {
         await trx.commit();
       }
+      if (!isUpdate) {
+        // this.aLog.permissionInfo([policy], 'DELETE', source, modifiedBy);
+      }
     } catch (err) {
       if (!externalTrx) {
         await trx.rollback(err);
+      }
+      if (!isUpdate) {
+        // this.aLog.permissionError(
+        //   [policy],
+        //   ['DELETE'],
+        //   source,
+        //   modifiedBy,
+        //   err,
+        // );
       }
       throw err;
     }
@@ -324,6 +495,8 @@ export class EnforcerDelegate {
   async removePolicies(
     policies: string[][],
     source: Source,
+    modifiedBy: string,
+    isUpdate?: boolean,
     allowToDeleCSVFilePolicy?: boolean,
     externalTrx?: Knex.Transaction,
   ): Promise<void> {
@@ -349,9 +522,21 @@ export class EnforcerDelegate {
       if (!externalTrx) {
         await trx.commit();
       }
+      if (!isUpdate) {
+        // this.aLog.permissionInfo(policies, 'DELETE', source, modifiedBy);
+      }
     } catch (err) {
       if (!externalTrx) {
         await trx.rollback(err);
+      }
+      if (!isUpdate) {
+        // this.aLog.permissionError(
+        //   policies,
+        //   ['DELETE'],
+        //   source,
+        //   modifiedBy,
+        //   err,
+        // );
       }
       throw err;
     }
@@ -380,16 +565,20 @@ export class EnforcerDelegate {
         throw new Error(`Failed to delete policy ${policyToString(policy)}`);
       }
 
+      let remainingGroupPolicies: string[][] = [];
+      let currentRoleMetadata;
       if (!isUpdate) {
-        const currentRoleMetadata =
-          await this.roleMetadataStorage.findRoleMetadata(roleEntity, trx);
-        const groupPolicies = await this.enforcer.getFilteredGroupingPolicy(
+        currentRoleMetadata = await this.roleMetadataStorage.findRoleMetadata(
+          roleEntity,
+          trx,
+        );
+        remainingGroupPolicies = await this.enforcer.getFilteredGroupingPolicy(
           1,
           roleEntity,
         );
         if (
           currentRoleMetadata &&
-          groupPolicies.length === 0 &&
+          remainingGroupPolicies.length === 0 &&
           roleEntity !== ADMIN_ROLE_NAME
         ) {
           await this.roleMetadataStorage.removeRoleMetadata(roleEntity, trx);
@@ -405,9 +594,55 @@ export class EnforcerDelegate {
       if (!externalTrx) {
         await trx.commit();
       }
+      if (!isUpdate) {
+        let operation: Operation;
+        let eventName: string;
+        let isDescriptionChanged: boolean;
+        let message: string;
+        if (remainingGroupPolicies.length === 0) {
+          operation = 'DELETE';
+          eventName = RoleEvents.DeleteRole;
+          isDescriptionChanged = false;
+          message = `Deleted ${roleMetadata.roleEntityRef}`;
+        } else {
+          operation = 'UPDATE';
+          eventName = RoleEvents.UpdateRole;
+          isDescriptionChanged =
+            roleMetadata.description !== currentRoleMetadata?.description;
+          message = `Updated ${roleMetadata.roleEntityRef}`;
+        }
+        const diff: RoleDiff = {
+          isDescriptionChanged,
+          removedMembers: [policy[0]],
+        };
+        const metadata: RoleAuditInfo = {
+          roleEntityRef: roleMetadata.roleEntityRef,
+          source: roleMetadata.source,
+          operation,
+          roleDescription: roleMetadata.description,
+          members: remainingGroupPolicies.map(p => p[0]),
+          diff,
+        };
+        await this.auditDefLog.auditLog({
+          message,
+          eventName: eventName.toString(),
+          stage: 'metadata',
+          metadata,
+          actor_id: roleMetadata.modifiedBy,
+        });
+      }
     } catch (err) {
       if (!externalTrx) {
         await trx.rollback(err);
+      }
+      if (!isUpdate) {
+        // this.aLog.roleError(
+        //   roleEntity,
+        //   operation ? [operation] : ['UPDATE', 'DELETE'],
+        //   err,
+        //   roleMetadata.source,
+        //   roleMetadata.modifiedBy!,
+        // );
       }
       throw err;
     }
@@ -422,7 +657,11 @@ export class EnforcerDelegate {
     externalTrx?: Knex.Transaction,
   ): Promise<void> {
     const trx = externalTrx ?? (await this.knex.transaction());
-    const roles = new Set<string>();
+    const roles = new Set<string>(
+      policies
+        .map(policy => policy[1])
+        .filter(policy => policy.startsWith('role:default')),
+    );
     try {
       for (const policy of policies) {
         await this.checkIfPolicyModifiable(
@@ -433,7 +672,6 @@ export class EnforcerDelegate {
         );
 
         await this.policyMetadataStorage.removePolicyMetadata(policy, trx);
-        roles.add(policy[1]);
       }
 
       const ok = await this.enforcer.removeGroupingPolicies(policies);
@@ -443,6 +681,7 @@ export class EnforcerDelegate {
         );
       }
 
+      const roleOperations = new Map<RoleMetadataDao, string[][]>();
       for (const roleEntity of roles) {
         if (!isUpdate) {
           const roleMetadata = await this.roleMetadataStorage.findRoleMetadata(
@@ -453,13 +692,16 @@ export class EnforcerDelegate {
             1,
             roleEntity,
           );
+
           if (
             roleMetadata &&
             groupPolicies.length === 0 &&
             roleEntity !== ADMIN_ROLE_NAME
           ) {
+            roleOperations.set(roleMetadata, groupPolicies);
             await this.roleMetadataStorage.removeRoleMetadata(roleEntity, trx);
           } else if (roleMetadata) {
+            roleOperations.set(roleMetadata, groupPolicies);
             roleMetadata.modifiedBy = modifiedBy;
             roleMetadata.lastModified = new Date().toUTCString();
             await this.roleMetadataStorage.updateRoleMetadata(
@@ -474,9 +716,54 @@ export class EnforcerDelegate {
       if (!externalTrx) {
         await trx.commit();
       }
+      if (!isUpdate) {
+        for (const entry of roleOperations.entries()) {
+          const roleMeta = entry[0];
+          const remainingGroupPolicies = entry[1];
+          const operation =
+            remainingGroupPolicies.length === 0 ? 'DELETE' : 'UPDATE';
+          const diff: RoleDiff = {
+            isDescriptionChanged: false,
+            removedMembers: policies.map(p => p[0]),
+          };
+          const metadata: RoleAuditInfo = {
+            roleEntityRef: roleMeta.roleEntityRef,
+            source: roleMeta.source,
+            operation,
+            roleDescription: roleMeta.description,
+            members: remainingGroupPolicies.map(p => p[0]),
+            diff,
+          };
+
+          const message =
+            operation === 'DELETE'
+              ? `Deleted ${roleMeta.roleEntityRef}`
+              : `Updated ${roleMeta.roleEntityRef}`;
+          await this.auditDefLog.auditLog({
+            message,
+            eventName: RoleEvents.DeleteRole.toString(),
+            stage: 'metadata',
+            metadata,
+            actor_id: modifiedBy,
+          });
+          // const removedMembers = policies
+          //   .filter(gp => gp[1] === roleMeta.roleEntityRef)
+          //   .map(gp => gp[0]);
+          // this.aLog.roleInfo(roleMeta, entry[1], [], removedMembers);
+        }
+      }
     } catch (err) {
       if (!externalTrx) {
         await trx.rollback(err);
+      }
+      if (!isUpdate) {
+        // this.aLog.roleError(
+        //   Array.from(roles),
+        //   ['UPDATE', 'DELETE'],
+        //   err,
+        //   source,
+        //   modifiedBy,
+        // );
       }
       throw err;
     }
@@ -485,36 +772,49 @@ export class EnforcerDelegate {
   async addOrUpdatePolicy(
     policy: string[],
     source: Source,
+    modifiedBy: string,
     isCSV: boolean,
-    externalTrx?: Knex.Transaction,
   ): Promise<void> {
-    const trx = externalTrx ?? (await this.knex.transaction());
+    const trx = await this.knex.transaction();
+    let operation: Operation | undefined;
     try {
       if (!(await this.enforcer.hasPolicy(...policy))) {
-        await this.addPolicy(policy, source, trx);
+        operation = 'CREATE';
+        await this.addPolicy(policy, source, modifiedBy, trx);
       } else if (await this.hasFilteredPolicyMetadata(policy, 'legacy', trx)) {
-        await this.removePolicy(policy, source, isCSV, trx);
-        await this.addPolicy(policy, source, trx);
+        operation = 'UPDATE';
+        await this.removePolicy(policy, source, modifiedBy, true, isCSV, trx);
+        await this.addPolicy(policy, source, modifiedBy, trx);
       }
-      if (!externalTrx) {
-        await trx.commit();
+
+      await trx.commit();
+      if (operation) {
+        // this.aLog.permissionInfo([policy], operation, source, modifiedBy);
       }
     } catch (err) {
-      if (!externalTrx) {
-        await trx.rollback(err);
-      }
+      await trx.rollback(err);
+
+      // const operations: Operation[] = operation
+      //   ? [operation]
+      //   : ['CREATE', 'UPDATE'];
+      // this.aLog.permissionError([policy], operations, source, modifiedBy, err);
       throw err;
     }
   }
 
   async addOrUpdateGroupingPolicy(
     groupPolicy: string[],
-    roleMetadata: RoleMetadataDao,
+    roleMetadata: RoleMetadataDao, // only roleEntityRef here?
     isCSV?: boolean,
-    externalTrx?: Knex.Transaction,
   ): Promise<void> {
-    const trx = externalTrx ?? (await this.knex.transaction());
+    const trx = await this.knex.transaction();
+    let operation: Operation | undefined;
     try {
+      operation = !this.roleMetadataStorage.findRoleMetadata(
+        roleMetadata.roleEntityRef,
+      )
+        ? 'CREATE'
+        : 'UPDATE';
       if (!(await this.hasGroupingPolicy(...groupPolicy))) {
         await this.addGroupingPolicy(groupPolicy, roleMetadata, trx);
       } else if (
@@ -529,13 +829,48 @@ export class EnforcerDelegate {
         );
         await this.addGroupingPolicy(groupPolicy, roleMetadata, trx);
       }
-      if (!externalTrx) {
-        await trx.commit();
-      }
+
+      await trx.commit();
+
+      // if (operation === 'CREATE') {
+      // this.aLog.roleInfo(roleMetadata, operation, [groupPolicy[0]]);
+      // } else {
+      // this.aLog.roleInfo(roleMetadata, operation);
+      // }
+      const diff: RoleDiff = {
+        addedMembers: groupPolicy.map(p => p[0]),
+      };
+      const metadata: RoleAuditInfo = {
+        roleEntityRef: roleMetadata.roleEntityRef,
+        source: roleMetadata.source,
+        operation,
+        roleDescription: roleMetadata.description,
+        members: groupPolicy.map(p => p[0]),
+        diff,
+      };
+      const message = operation === 'CREATE' ? 'Created' : 'Updated';
+      const eventName =
+        operation === 'CREATE' ? RoleEvents.CreateRole : RoleEvents.UpdateRole;
+      await this.auditDefLog.auditLog({
+        message: `${message} ${roleMetadata.roleEntityRef}}`,
+        eventName: `${eventName.toString()}`,
+        stage: 'metadata',
+        metadata,
+        actor_id: roleMetadata.roleEntityRef,
+      });
     } catch (err) {
-      if (!externalTrx) {
-        await trx.rollback(err);
-      }
+      await trx.rollback(err);
+
+      // const operations: Operation[] = operation
+      //   ? [operation]
+      //   : ['CREATE', 'UPDATE'];
+      // this.aLog.roleError(
+      //   roleMetadata.roleEntityRef,
+      //   operations,
+      //   err,
+      //   roleMetadata.source,
+      //   roleMetadata.modifiedBy,
+      // );
       throw err;
     }
   }
@@ -544,10 +879,15 @@ export class EnforcerDelegate {
     groupPolicies: string[][],
     roleMetadata: RoleMetadataDao,
     isCSV?: boolean,
-    externalTrx?: Knex.Transaction,
   ): Promise<void> {
-    const trx = externalTrx ?? (await this.knex.transaction());
+    const trx = await this.knex.transaction();
+    let operation: Operation | undefined;
     try {
+      operation = !this.roleMetadataStorage.findRoleMetadata(
+        roleMetadata.roleEntityRef,
+      )
+        ? 'CREATE'
+        : 'UPDATE';
       for (const groupPolicy of groupPolicies) {
         if (!(await this.hasGroupingPolicy(...groupPolicy))) {
           await this.addGroupingPolicy(groupPolicy, roleMetadata, trx);
@@ -564,13 +904,53 @@ export class EnforcerDelegate {
           await this.addGroupingPolicy(groupPolicy, roleMetadata, trx);
         }
       }
-      if (!externalTrx) {
-        await trx.commit();
-      }
+
+      await trx.commit();
+
+      const message = operation === 'CREATE' ? 'Created' : 'Updated';
+      const eventName =
+        operation === 'CREATE' ? RoleEvents.CreateRole : RoleEvents.UpdateRole;
+      const addedMembers =
+        operation === 'CREATE' ? groupPolicies.map(p => p[0]) : [];
+      const diff: RoleDiff = { addedMembers };
+      const metadata: RoleAuditInfo = {
+        roleEntityRef: roleMetadata.roleEntityRef,
+        source: roleMetadata.source,
+        operation,
+        roleDescription: roleMetadata.description,
+        members: groupPolicies.map(p => p[0]),
+        diff,
+      };
+      await this.auditDefLog.auditLog({
+        message: `${message} ${roleMetadata.roleEntityRef}}`,
+        eventName: `${eventName.toString()}`,
+        stage: 'metadata',
+        metadata,
+        actor_id: roleMetadata.roleEntityRef,
+      });
+      // if (operation === 'CREATE') {
+      // this.aLog.roleInfo(
+      //   roleMetadata,
+      //   operation,
+      //   groupPolicies.map(gp => gp[0]),
+      // );
+      // } else {
+      // this.aLog.roleInfo(roleMetadata, operation);
+      // }
     } catch (err) {
-      if (!externalTrx) {
-        await trx.rollback(err);
-      }
+      await trx.rollback(err);
+
+      // const operations: Operation[] = operation
+      //   ? [operation]
+      //   : ['CREATE', 'UPDATE'];
+
+      // this.aLog.roleError(
+      //   roleMetadata.roleEntityRef,
+      //   operations,
+      //   err,
+      //   roleMetadata.source,
+      //   roleMetadata.modifiedBy,
+      // );
       throw err;
     }
   }
