@@ -600,6 +600,8 @@ export class EnforcerDelegate {
             groupPolicies.length === 0 &&
             roleEntity !== ADMIN_ROLE_NAME
           ) {
+            // let's set modifiedBy for audit logging
+            roleMetadata.modifiedBy = modifiedBy;
             roleOperations.set(roleMetadata, groupPolicies);
             await this.roleMetadataStorage.removeRoleMetadata(roleEntity, trx);
           } else if (roleMetadata) {

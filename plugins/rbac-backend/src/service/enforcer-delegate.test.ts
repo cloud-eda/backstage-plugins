@@ -548,7 +548,7 @@ describe('EnforcerDelegate', () => {
           author: 'user:default/some-user',
           modifiedBy: 'user:default/some-user',
         },
-        false,
+        true,
       );
 
       expect(enfUpdateGroupingPolicySpy).toHaveBeenCalledWith(

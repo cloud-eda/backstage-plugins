@@ -1118,6 +1118,7 @@ describe('RBACPermissionPolicy Tests', () => {
       await enfDelegate.addGroupingPolicy(oldGroupPolicy, {
         source: 'configuration',
         roleEntityRef: ADMIN_ROLE_NAME,
+        modifiedBy: `user:default/tom`,
       });
 
       policy = await newPermissionPolicy(
@@ -1231,11 +1232,15 @@ describe('Policy checks for resourced permissions defined by name', () => {
   it('should allow access to resourced permission assigned by name', async () => {
     catalogApi.getEntities.mockReturnValue({ items: [] });
 
+    const modifiedBy = `user:default/tom`;
     await enfDelegate.addGroupingPolicy(
       ['user:default/tor', 'role:default/catalog_reader'],
-      { source: 'csv-file', roleEntityRef: 'role:default/catalog_reader' },
+      {
+        source: 'csv-file',
+        roleEntityRef: 'role:default/catalog_reader',
+        modifiedBy,
+      },
     );
-    const modifiedBy = `user:default/tom`;
     await enfDelegate.addPolicy(
       ['role:default/catalog_reader', 'catalog.entity.read', 'read', 'allow'],
       'csv-file',
@@ -1256,11 +1261,15 @@ describe('Policy checks for resourced permissions defined by name', () => {
   it('should allow access to resourced permission assigned by name, because it has higher priority then permission for the same resource assigned by resource type', async () => {
     catalogApi.getEntities.mockReturnValue({ items: [] });
 
+    const modifiedBy = `user:default/tom`;
     await enfDelegate.addGroupingPolicy(
       ['user:default/tor', 'role:default/catalog_reader'],
-      { source: 'csv-file', roleEntityRef: 'role:default/catalog_reader' },
+      {
+        source: 'csv-file',
+        roleEntityRef: 'role:default/catalog_reader',
+        modifiedBy,
+      },
     );
-    const modifiedBy = `user:default/tom`;
     await enfDelegate.addPolicies(
       [
         ['role:default/catalog_reader', 'catalog.entity.read', 'read', 'allow'],
@@ -1284,11 +1293,16 @@ describe('Policy checks for resourced permissions defined by name', () => {
   it('should deny access to resourced permission assigned by name, because it has higher priority then permission for the same resource assigned by resource type', async () => {
     catalogApi.getEntities.mockReturnValue({ items: [] });
 
+    const modifiedBy = `user:default/tom`;
     await enfDelegate.addGroupingPolicy(
       ['user:default/tor', 'role:default/catalog_reader'],
-      { source: 'csv-file', roleEntityRef: 'role:default/catalog_reader' },
+      {
+        source: 'csv-file',
+        roleEntityRef: 'role:default/catalog_reader',
+        modifiedBy,
+      },
     );
-    const modifiedBy = `user:default/tom`;
+
     await enfDelegate.addPolicies(
       [
         ['role:default/catalog_reader', 'catalog.entity.read', 'read', 'deny'],
@@ -1325,11 +1339,16 @@ describe('Policy checks for resourced permissions defined by name', () => {
       return { items: [groupEntityMock] };
     });
 
+    const modifiedBy = `user:default/tom`;
     await enfDelegate.addGroupingPolicy(
       ['group:default/team-a', 'role:default/catalog_user'],
-      { source: 'csv-file', roleEntityRef: 'role:default/catalog_user' },
+      {
+        source: 'csv-file',
+        roleEntityRef: 'role:default/catalog_user',
+        modifiedBy,
+      },
     );
-    const modifiedBy = `user:default/tom`;
+
     await enfDelegate.addPolicies(
       [['role:default/catalog_user', 'catalog.entity.read', 'read', 'allow']],
       'csv-file',
@@ -1372,15 +1391,24 @@ describe('Policy checks for resourced permissions defined by name', () => {
       return { items: [groupParentMock, groupEntityMock] };
     });
 
+    const modifiedBy = `user:default/tom`;
     await enfDelegate.addGroupingPolicy(
       ['group:default/team-b', 'role:default/catalog_user'],
-      { source: 'csv-file', roleEntityRef: 'role:default/catalog_user' },
+      {
+        source: 'csv-file',
+        roleEntityRef: 'role:default/catalog_user',
+        modifiedBy,
+      },
     );
     await enfDelegate.addGroupingPolicy(
       ['group:default/team-a', 'group:default/team-b'],
-      { source: 'csv-file', roleEntityRef: 'role:default/catalog_user' },
+      {
+        source: 'csv-file',
+        roleEntityRef: 'role:default/catalog_user',
+        modifiedBy,
+      },
     );
-    const modifiedBy = `user:default/tom`;
+
     await enfDelegate.addPolicies(
       [['role:default/catalog_user', 'catalog.entity.read', 'read', 'allow']],
       'csv-file',

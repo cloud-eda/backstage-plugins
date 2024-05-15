@@ -330,7 +330,7 @@ describe('CSVFileWatcher', () => {
       await enforcerDelegate.addGroupingPolicy(legacyRole, {
         roleEntityRef: legacyRole[1],
         source: 'legacy',
-        modifiedBy: '',
+        modifiedBy: CSV_PERMISSION_POLICY_FILE_AUTHOR,
       });
 
       await csvFileWatcher.initialize(csvFileName, false);
