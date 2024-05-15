@@ -130,7 +130,7 @@ export class DefaultAuditLogger implements AuditLogger {
       metadata: options.metadata,
     });
 
-    this.logger.info(`${options.message}, ${JSON.stringify(auditLogDetails)}`);
+    this.logger.info(`${options.message} ${JSON.stringify(auditLogDetails)}`);
   }
 
   async auditErrorLog(options: AuditErrorLogOptions): Promise<void> {

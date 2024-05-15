@@ -3,16 +3,19 @@ import { NotAllowedError, NotFoundError } from '@backstage/errors';
 import { Enforcer, newModelFromString } from 'casbin';
 import { Knex } from 'knex';
 
-import { AuditLogger } from '@janus-idp/backstage-plugin-audit-log-common';
+import {
+  AuditLogger,
+  AuditLogOptions,
+} from '@janus-idp/backstage-plugin-audit-log-common';
 import {
   PermissionPolicyMetadata,
   Source,
 } from '@janus-idp/backstage-plugin-rbac-common';
 
 import {
+  createAuditRoleOptions,
   Operation,
   RoleAuditInfo,
-  RoleDiff,
   RoleEvents,
 } from '../audit-log/audit-logger';
 import {
@@ -23,7 +26,7 @@ import {
   RoleMetadataDao,
   RoleMetadataStorage,
 } from '../database/role-metadata';
-import { membersDiff, policiesToString, policyToString } from '../helper';
+import { policiesToString, policyToString } from '../helper';
 import { MODEL } from './permission-model';
 import { ADMIN_ROLE_NAME } from './permission-policy';
 
@@ -151,12 +154,12 @@ export class EnforcerDelegate {
   async addGroupingPolicy(
     policy: string[],
     roleMetadata: RoleMetadataDao,
+    isUpdate?: boolean,
     externalTrx?: Knex.Transaction,
   ): Promise<void> {
     const trx = externalTrx ?? (await this.knex.transaction());
     const entityRef = roleMetadata.roleEntityRef;
 
-    let operation: Operation | undefined;
     try {
       await this.policyMetadataStorage.createPolicyMetadata(
         roleMetadata.source,
@@ -164,23 +167,21 @@ export class EnforcerDelegate {
         trx,
       );
 
-      let currentMetadata;
+      let currentRoleMetadata;
       if (entityRef.startsWith(`role:`)) {
-        currentMetadata = await this.roleMetadataStorage.findRoleMetadata(
+        currentRoleMetadata = await this.roleMetadataStorage.findRoleMetadata(
           entityRef,
           trx,
         );
       }
 
-      if (currentMetadata) {
-        operation = 'UPDATE';
+      if (currentRoleMetadata) {
         await this.roleMetadataStorage.updateRoleMetadata(
-          this.mergeMetadata(currentMetadata, roleMetadata),
+          this.mergeMetadata(currentRoleMetadata, roleMetadata),
           entityRef,
           trx,
         );
       } else {
-        operation = 'CREATE';
         const currentDate: Date = new Date();
         roleMetadata.createdAt = currentDate.toUTCString();
         roleMetadata.lastModified = currentDate.toUTCString();
@@ -193,35 +194,13 @@ export class EnforcerDelegate {
       }
       if (!externalTrx) {
         await trx.commit();
+      }
 
-        const diff: RoleDiff = {
-          addedMembers: [policy[0]],
-        };
-        const metadata: RoleAuditInfo = {
-          roleEntityRef: roleMetadata.roleEntityRef,
-          source: roleMetadata.source,
-          operation,
-          roleDescription: roleMetadata.description,
-          members: policy.map(p => p[0]),
-          diff,
-        };
-        const message =
-          operation === 'CREATE'
-            ? `Created ${roleMetadata.roleEntityRef}}`
-            : `Updated ${roleMetadata.roleEntityRef}}`;
-        const eventName =
-          operation === 'CREATE'
-            ? RoleEvents.CreateRole
-            : RoleEvents.UpdateRole;
-        await this.auditDefLog.auditLog({
-          message: message,
-          eventName: `${eventName.toString()}`,
-          stage: 'metadata',
-          metadata,
-          actor_id: roleMetadata.roleEntityRef,
-        });
-
-        // this.aLog.roleInfo(roleMetadata, actor, context, operation, [policy[0]]);
+      if (!isUpdate) {
+        const auditOptions = createAuditRoleOptions('CREATE', roleMetadata, [
+          policy,
+        ]);
+        await this.auditDefLog.auditLog(auditOptions);
       }
     } catch (err) {
       if (!externalTrx) {
@@ -242,10 +221,11 @@ export class EnforcerDelegate {
   async addGroupingPolicies(
     policies: string[][],
     roleMetadata: RoleMetadataDao,
+    isUpdate?: boolean,
     externalTrx?: Knex.Transaction,
   ): Promise<void> {
     const trx = externalTrx ?? (await this.knex.transaction());
-    let operation: Operation | undefined;
+
     try {
       for (const policy of policies) {
         await this.policyMetadataStorage.createPolicyMetadata(
@@ -261,14 +241,12 @@ export class EnforcerDelegate {
           trx,
         );
       if (currentRoleMetadata) {
-        operation = 'UPDATE';
         await this.roleMetadataStorage.updateRoleMetadata(
           this.mergeMetadata(currentRoleMetadata, roleMetadata),
           roleMetadata.roleEntityRef,
           trx,
         );
       } else {
-        operation = 'CREATE';
         const currentDate: Date = new Date();
         roleMetadata.createdAt = currentDate.toUTCString();
         roleMetadata.lastModified = currentDate.toUTCString();
@@ -284,41 +262,15 @@ export class EnforcerDelegate {
 
       if (!externalTrx) {
         await trx.commit();
+      }
 
-        const diff: RoleDiff = {
-          addedMembers: policies.map(p => p[0]),
-        };
-        const metadata: RoleAuditInfo = {
-          roleEntityRef: roleMetadata.roleEntityRef,
-          source: roleMetadata.source,
-          operation,
-          roleDescription: roleMetadata.description,
-          members: policies.map(p => p[0]),
-          diff,
-        };
-        const message =
-          operation === 'CREATE'
-            ? `Created ${roleMetadata.roleEntityRef}`
-            : `Updated ${roleMetadata.roleEntityRef}`;
-        const eventName =
-          operation === 'CREATE'
-            ? RoleEvents.CreateRole
-            : RoleEvents.UpdateRole;
-        await this.auditDefLog.auditLog({
-          message,
-          eventName: `${eventName.toString()}`,
-          stage: 'metadata',
-          metadata,
-          actor_id: roleMetadata.roleEntityRef,
-        });
-        // console.log(`===========`);
-        //   this.aLog.roleInfo(
-        //     roleMetadata,
-        //     actor,
-        //     roleMetadata.source,
-        //     operation,
-        //     policies.map(p => p[0]),
-        //   );
+      if (!isUpdate) {
+        const auditOptions = createAuditRoleOptions(
+          'CREATE',
+          roleMetadata,
+          policies,
+        );
+        await this.auditDefLog.auditLog(auditOptions);
       }
     } catch (err) {
       if (!externalTrx) {
@@ -362,46 +314,27 @@ export class EnforcerDelegate {
         true,
         trx,
       );
-      await this.addGroupingPolicies(newRole, newRoleMetadata, trx);
+      await this.addGroupingPolicies(newRole, newRoleMetadata, true, trx);
 
       await trx.commit();
 
-      const { addedMembers, removedMembers } = membersDiff(
-        oldRole.map(r => r[0]),
-        newRole.map(r => r[0]),
+      const auditOptions = createAuditRoleOptions(
+        'UPDATE',
+        newRoleMetadata,
+        newRole,
       );
-      const diff: RoleDiff = {
-        isDescriptionChanged:
-          currentMetadata.description !== newRoleMetadata.description,
-        addedMembers,
-        removedMembers,
-      };
-      const metadata: RoleAuditInfo = {
-        roleEntityRef: newRoleMetadata.roleEntityRef,
-        source: newRoleMetadata.source,
-        operation: 'UPDATE',
-        roleDescription: newRoleMetadata.description,
-        members: newRole.map(gp => gp[0]),
-        diff,
-      };
-
-      await this.auditDefLog.auditLog({
-        message: `Updated ${newRoleMetadata.roleEntityRef}`,
-        eventName: RoleEvents.UpdateRole.toString(),
-        stage: 'metadata',
-        metadata,
-        actor_id: newRoleMetadata.modifiedBy,
-      });
+      await this.auditDefLog.auditLog(auditOptions);
     } catch (err) {
       await trx.rollback(err);
 
-      // this.aLog.roleError(
+      // this.auditDefLog.roleError(
       //   newRoleMetadata.roleEntityRef,
       //   ['UPDATE'],
       //   err,
       //   newRoleMetadata.source,
       //   newRoleMetadata.modifiedBy,
       // );
+
       throw err;
     }
   }
@@ -595,48 +528,17 @@ export class EnforcerDelegate {
         await trx.commit();
       }
       if (!isUpdate) {
-        let operation: Operation;
-        let eventName: string;
-        let isDescriptionChanged: boolean;
-        let message: string;
-        if (remainingGroupPolicies.length === 0) {
-          operation = 'DELETE';
-          eventName = RoleEvents.DeleteRole;
-          isDescriptionChanged = false;
-          message = `Deleted ${roleMetadata.roleEntityRef}`;
-        } else {
-          operation = 'UPDATE';
-          eventName = RoleEvents.UpdateRole;
-          isDescriptionChanged =
-            roleMetadata.description !== currentRoleMetadata?.description;
-          message = `Updated ${roleMetadata.roleEntityRef}`;
-        }
-        const diff: RoleDiff = {
-          isDescriptionChanged,
-          removedMembers: [policy[0]],
-        };
-        const metadata: RoleAuditInfo = {
-          roleEntityRef: roleMetadata.roleEntityRef,
-          source: roleMetadata.source,
-          operation,
-          roleDescription: roleMetadata.description,
-          members: remainingGroupPolicies.map(p => p[0]),
-          diff,
-        };
-        await this.auditDefLog.auditLog({
-          message,
-          eventName: eventName.toString(),
-          stage: 'metadata',
-          metadata,
-          actor_id: roleMetadata.modifiedBy,
-        });
+        const auditOptions = createAuditRoleOptions('DELETE', roleMetadata, [
+          policy,
+        ]);
+        await this.auditDefLog.auditLog(auditOptions);
       }
     } catch (err) {
       if (!externalTrx) {
         await trx.rollback(err);
       }
       if (!isUpdate) {
-        // this.aLog.roleError(
+        // this.auditDefLog.roleError(
         //   roleEntity,
         //   operation ? [operation] : ['UPDATE', 'DELETE'],
         //   err,
@@ -651,7 +553,7 @@ export class EnforcerDelegate {
   async removeGroupingPolicies(
     policies: string[][],
     source: Source,
-    modifiedBy?: string,
+    modifiedBy: string,
     allowToDeleteCSVFilePolicy?: boolean,
     isUpdate?: boolean,
     externalTrx?: Knex.Transaction,
@@ -718,38 +620,12 @@ export class EnforcerDelegate {
       }
       if (!isUpdate) {
         for (const entry of roleOperations.entries()) {
-          const roleMeta = entry[0];
-          const remainingGroupPolicies = entry[1];
-          const operation =
-            remainingGroupPolicies.length === 0 ? 'DELETE' : 'UPDATE';
-          const diff: RoleDiff = {
-            isDescriptionChanged: false,
-            removedMembers: policies.map(p => p[0]),
-          };
-          const metadata: RoleAuditInfo = {
-            roleEntityRef: roleMeta.roleEntityRef,
-            source: roleMeta.source,
-            operation,
-            roleDescription: roleMeta.description,
-            members: remainingGroupPolicies.map(p => p[0]),
-            diff,
-          };
-
-          const message =
-            operation === 'DELETE'
-              ? `Deleted ${roleMeta.roleEntityRef}`
-              : `Updated ${roleMeta.roleEntityRef}`;
-          await this.auditDefLog.auditLog({
-            message,
-            eventName: RoleEvents.DeleteRole.toString(),
-            stage: 'metadata',
-            metadata,
-            actor_id: modifiedBy,
-          });
-          // const removedMembers = policies
-          //   .filter(gp => gp[1] === roleMeta.roleEntityRef)
-          //   .map(gp => gp[0]);
-          // this.aLog.roleInfo(roleMeta, entry[1], [], removedMembers);
+          const auditOptions = createAuditRoleOptions(
+            'DELETE',
+            entry[0],
+            entry[1],
+          );
+          await this.auditDefLog.auditLog(auditOptions);
         }
       }
     } catch (err) {
@@ -757,7 +633,7 @@ export class EnforcerDelegate {
         await trx.rollback(err);
       }
       if (!isUpdate) {
-        // this.aLog.roleError(
+        // this.auditDefLog.roleError(
         //   Array.from(roles),
         //   ['UPDATE', 'DELETE'],
         //   err,
@@ -804,22 +680,19 @@ export class EnforcerDelegate {
 
   async addOrUpdateGroupingPolicy(
     groupPolicy: string[],
-    roleMetadata: RoleMetadataDao, // only roleEntityRef here?
+    roleMetadata: RoleMetadataDao,
     isCSV?: boolean,
   ): Promise<void> {
     const trx = await this.knex.transaction();
     let operation: Operation | undefined;
     try {
-      operation = !this.roleMetadataStorage.findRoleMetadata(
-        roleMetadata.roleEntityRef,
-      )
-        ? 'CREATE'
-        : 'UPDATE';
       if (!(await this.hasGroupingPolicy(...groupPolicy))) {
-        await this.addGroupingPolicy(groupPolicy, roleMetadata, trx);
+        await this.addGroupingPolicy(groupPolicy, roleMetadata, false, trx);
+        operation = 'CREATE';
       } else if (
         await this.hasFilteredPolicyMetadata(groupPolicy, 'legacy', trx)
       ) {
+        operation = 'UPDATE';
         await this.removeGroupingPolicy(
           groupPolicy,
           roleMetadata,
@@ -827,44 +700,25 @@ export class EnforcerDelegate {
           isCSV,
           trx,
         );
-        await this.addGroupingPolicy(groupPolicy, roleMetadata, trx);
+        await this.addGroupingPolicy(groupPolicy, roleMetadata, true, trx);
       }
 
       await trx.commit();
 
-      // if (operation === 'CREATE') {
-      // this.aLog.roleInfo(roleMetadata, operation, [groupPolicy[0]]);
-      // } else {
-      // this.aLog.roleInfo(roleMetadata, operation);
-      // }
-      const diff: RoleDiff = {
-        addedMembers: groupPolicy.map(p => p[0]),
-      };
-      const metadata: RoleAuditInfo = {
-        roleEntityRef: roleMetadata.roleEntityRef,
-        source: roleMetadata.source,
-        operation,
-        roleDescription: roleMetadata.description,
-        members: groupPolicy.map(p => p[0]),
-        diff,
-      };
-      const message = operation === 'CREATE' ? 'Created' : 'Updated';
-      const eventName =
-        operation === 'CREATE' ? RoleEvents.CreateRole : RoleEvents.UpdateRole;
-      await this.auditDefLog.auditLog({
-        message: `${message} ${roleMetadata.roleEntityRef}}`,
-        eventName: `${eventName.toString()}`,
-        stage: 'metadata',
-        metadata,
-        actor_id: roleMetadata.roleEntityRef,
-      });
+      if (operation) {
+        const auditOptions = createAuditRoleOptions(operation, roleMetadata, [
+          groupPolicy,
+        ]);
+        await this.auditDefLog.auditLog(auditOptions);
+      }
     } catch (err) {
       await trx.rollback(err);
 
       // const operations: Operation[] = operation
       //   ? [operation]
       //   : ['CREATE', 'UPDATE'];
-      // this.aLog.roleError(
+
+      // this.auditDefLog.roleError(
       //   roleMetadata.roleEntityRef,
       //   operations,
       //   err,
@@ -883,17 +737,14 @@ export class EnforcerDelegate {
     const trx = await this.knex.transaction();
     let operation: Operation | undefined;
     try {
-      operation = !this.roleMetadataStorage.findRoleMetadata(
-        roleMetadata.roleEntityRef,
-      )
-        ? 'CREATE'
-        : 'UPDATE';
       for (const groupPolicy of groupPolicies) {
         if (!(await this.hasGroupingPolicy(...groupPolicy))) {
-          await this.addGroupingPolicy(groupPolicy, roleMetadata, trx);
+          operation = 'CREATE';
+          await this.addGroupingPolicy(groupPolicy, roleMetadata, false, trx);
         } else if (
           await this.hasFilteredPolicyMetadata(groupPolicy, 'legacy', trx)
         ) {
+          operation = 'UPDATE';
           await this.removeGroupingPolicy(
             groupPolicy,
             roleMetadata,
@@ -901,42 +752,20 @@ export class EnforcerDelegate {
             isCSV,
             trx,
           );
-          await this.addGroupingPolicy(groupPolicy, roleMetadata, trx);
+          await this.addGroupingPolicy(groupPolicy, roleMetadata, true, trx);
         }
       }
 
       await trx.commit();
 
-      const message = operation === 'CREATE' ? 'Created' : 'Updated';
-      const eventName =
-        operation === 'CREATE' ? RoleEvents.CreateRole : RoleEvents.UpdateRole;
-      const addedMembers =
-        operation === 'CREATE' ? groupPolicies.map(p => p[0]) : [];
-      const diff: RoleDiff = { addedMembers };
-      const metadata: RoleAuditInfo = {
-        roleEntityRef: roleMetadata.roleEntityRef,
-        source: roleMetadata.source,
-        operation,
-        roleDescription: roleMetadata.description,
-        members: groupPolicies.map(p => p[0]),
-        diff,
-      };
-      await this.auditDefLog.auditLog({
-        message: `${message} ${roleMetadata.roleEntityRef}}`,
-        eventName: `${eventName.toString()}`,
-        stage: 'metadata',
-        metadata,
-        actor_id: roleMetadata.roleEntityRef,
-      });
-      // if (operation === 'CREATE') {
-      // this.aLog.roleInfo(
-      //   roleMetadata,
-      //   operation,
-      //   groupPolicies.map(gp => gp[0]),
-      // );
-      // } else {
-      // this.aLog.roleInfo(roleMetadata, operation);
-      // }
+      if (operation) {
+        const auditOptions = createAuditRoleOptions(
+          operation,
+          roleMetadata,
+          groupPolicies,
+        );
+        await this.auditDefLog.auditLog(auditOptions);
+      }
     } catch (err) {
       await trx.rollback(err);
 
@@ -944,7 +773,7 @@ export class EnforcerDelegate {
       //   ? [operation]
       //   : ['CREATE', 'UPDATE'];
 
-      // this.aLog.roleError(
+      // this.auditDefLog.roleError(
       //   roleMetadata.roleEntityRef,
       //   operations,
       //   err,

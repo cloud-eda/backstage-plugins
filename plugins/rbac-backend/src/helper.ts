@@ -88,13 +88,6 @@ export type Diff = {
   removedMembers: string[];
 };
 
-export function membersDiff(a: string[], b: string[]): Diff {
-  const differenceAtoB = a.filter(item => !b.includes(item));
-  const differenceBtoA = b.filter(item => !a.includes(item));
-
-  return { addedMembers: differenceBtoA, removedMembers: differenceAtoB };
-}
-
 export function isPermissionAction(action: string): action is PermissionAction {
   return ['create', 'read', 'update', 'delete', 'use'].includes(
     action as PermissionAction,

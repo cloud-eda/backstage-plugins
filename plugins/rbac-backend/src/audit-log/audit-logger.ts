@@ -11,13 +11,17 @@
 //   ActorDetails,
 //   AuditLogDetails,
 // } from '@janus-idp/backstage-plugin-audit-log-common';
+import { AuditLogOptions } from '@janus-idp/backstage-plugin-audit-log-common';
 import {
+  RoleMetadata,
   // PermissionAction,
   // PermissionInfo,
   // RoleConditionalPolicyDecision,
   Source,
   // toPermissionAction,
 } from '@janus-idp/backstage-plugin-rbac-common';
+
+import { RoleMetadataDao } from '../database/role-metadata';
 
 // import { RoleMetadataDao } from '../database/role-metadata';
 
@@ -28,28 +32,58 @@ export enum RoleEvents {
 }
 export type Operation = 'CREATE' | 'UPDATE' | 'DELETE';
 
-// type LogMsg = {
-//   isAuditLog: true;
-//   entityRef: string | string[];
-//   source: Source;
-//   modifiedBy?: string;
-// };
-
-export type RoleDiff = {
-  isDescriptionChanged?: boolean;
-  // isSourceChanged?
-  addedMembers?: string[];
-  removedMembers?: string[];
-};
-
 export type RoleAuditInfo = {
   roleEntityRef: string;
-  roleDescription?: string;
+  description?: string;
   members: string[];
   source: Source;
   operation: Operation;
-  diff: RoleDiff;
 };
+
+const stage = 'metadata';
+
+export function createAuditRoleOptions(
+  operation: Operation,
+  metadata: RoleMetadataDao,
+  groupPolicies: string[][],
+): AuditLogOptions {
+  let message: string;
+  let eventName: string;
+  switch (operation) {
+    case 'CREATE':
+      message = `Created '${metadata.roleEntityRef}'`;
+      eventName = RoleEvents.CreateRole;
+      break;
+    case 'UPDATE':
+      message = `Updated '${metadata.roleEntityRef}'`;
+      eventName = RoleEvents.UpdateRole;
+      break;
+    case 'DELETE':
+      message = `Deleted '${metadata.roleEntityRef}'`;
+      eventName = RoleEvents.DeleteRole;
+      break;
+    default:
+      throw new Error(`Unexpected audit log operation: ${operation}`);
+  }
+
+  const members = groupPolicies.map(p => p[0]) ?? [];
+
+  const auditInfo: RoleAuditInfo = {
+    roleEntityRef: metadata.roleEntityRef,
+    operation,
+    source: metadata.source,
+    description: metadata.description ?? '',
+    members: members,
+  };
+
+  return {
+    message,
+    eventName: `${eventName.toString()}`,
+    stage,
+    metadata: auditInfo,
+    actor_id: metadata.modifiedBy || metadata.author,
+  };
+}
 
 // type RoleAuditLog = AuditLogDetails & {
 //   meta: RoleInfo;

@@ -12,6 +12,7 @@ export interface RoleMetadataDao extends RoleMetadata {
   id?: number;
   roleEntityRef: string;
   source: Source;
+  modifiedBy: string;
 }
 
 export interface RoleMetadataStorage {
@@ -140,13 +141,14 @@ export function daoToMetadata(dao: RoleMetadataDao): RoleMetadata {
   };
 }
 
-export function metadataToDao(
-  roleMetadata: RoleMetadataDao,
-  roleEntityRef: string,
-): RoleMetadataDao {
-  return {
-    roleEntityRef,
-    source: roleMetadata.source,
-    description: roleMetadata.description,
-  };
-}
+// export function metadataToDao(
+//   roleMetadata: RoleMetadataDao,
+//   roleEntityRef: string,
+// ): RoleMetadataDao {
+//   return {
+//     roleEntityRef,
+//     source: roleMetadata.source,
+//     description: roleMetadata.description,
+//     modifiedBy: roleMetadata.modifiedBy,
+//   };
+// }
