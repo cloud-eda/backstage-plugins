@@ -195,9 +195,8 @@ describe('YamlConditionalFileWatcher', () => {
     loggerWarnSpy.mockClear();
   });
 
-  function createWatcher(filePath?: string): YamlConditinalPoliciesFileWatcher {
+  function createWatcher(): YamlConditinalPoliciesFileWatcher {
     return new YamlConditinalPoliciesFileWatcher(
-      filePath,
       false,
       loggerMock,
       conditionalStorageMock as DataBaseConditionalStorage,
@@ -211,8 +210,8 @@ describe('YamlConditionalFileWatcher', () => {
 
   test('handles errors for invalid file paths', async () => {
     const invalidFilePath = 'invalid-file-path.yaml';
-    const watcher = createWatcher(invalidFilePath);
-    await watcher.initialize();
+    const watcher = createWatcher();
+    await watcher.initialize(invalidFilePath);
 
     const auditEvents = auditLoggerMock.auditLog.mock.calls;
     expect(auditEvents.length).toBe(1);
@@ -226,8 +225,8 @@ describe('YamlConditionalFileWatcher', () => {
       __dirname,
       './../__fixtures__/data/invalid-conditions/invalid-yaml.yaml',
     );
-    const watcher = createWatcher(invalidFilePath);
-    await watcher.initialize();
+    const watcher = createWatcher();
+    await watcher.initialize(invalidFilePath);
 
     const auditEvents = auditLoggerMock.auditLog.mock.calls;
     expect(auditEvents.length).toBe(1);
@@ -252,8 +251,8 @@ describe('YamlConditionalFileWatcher', () => {
         throw new Error('unknow error message');
       });
 
-    const watcher = createWatcher(csvFileName);
-    await watcher.initialize();
+    const watcher = createWatcher();
+    await watcher.initialize(csvFileName);
 
     expect(conditionalStorageMock.createCondition).toHaveBeenCalled();
 
@@ -273,8 +272,8 @@ describe('YamlConditionalFileWatcher', () => {
       .fn()
       .mockImplementation(() => csvFileRoles);
 
-    const watcher = createWatcher(csvFileName);
-    await watcher.initialize();
+    const watcher = createWatcher();
+    await watcher.initialize(csvFileName);
 
     expect(conditionalStorageMock.createCondition).toHaveBeenCalledWith(
       conditionToStore1,
@@ -300,8 +299,8 @@ describe('YamlConditionalFileWatcher', () => {
       __dirname,
       './../__fixtures__/data/valid-conditions/empty-conditions.yaml',
     );
-    const watcher = createWatcher(csvFileName);
-    await watcher.initialize();
+    const watcher = createWatcher();
+    await watcher.initialize(csvFileName);
 
     expect(conditionalStorageMock.createCondition).not.toHaveBeenCalled();
     const auditEvents: any[] = auditLoggerMock.auditLog.mock.calls;
@@ -321,8 +320,8 @@ describe('YamlConditionalFileWatcher', () => {
         },
       ]);
 
-    const watcher = createWatcher(csvFileName);
-    await watcher.initialize();
+    const watcher = createWatcher();
+    await watcher.initialize(csvFileName);
 
     expect(conditionalStorageMock.createCondition).not.toHaveBeenCalled();
 
@@ -346,8 +345,8 @@ describe('YamlConditionalFileWatcher', () => {
       .fn()
       .mockImplementation(() => []);
 
-    const watcher = createWatcher(csvFileName);
-    await watcher.initialize();
+    const watcher = createWatcher();
+    await watcher.initialize(csvFileName);
 
     expect(conditionalStorageMock.createCondition).not.toHaveBeenCalled();
 
@@ -371,8 +370,8 @@ describe('YamlConditionalFileWatcher', () => {
       .fn()
       .mockImplementation(() => []);
 
-    const watcher = createWatcher(csvFileName);
-    await watcher.initialize();
+    const watcher = createWatcher();
+    await watcher.initialize(csvFileName);
 
     expect(conditionalStorageMock.createCondition).not.toHaveBeenCalled();
 
@@ -398,8 +397,8 @@ describe('YamlConditionalFileWatcher', () => {
         throw new Error('unknow error message');
       });
 
-    const watcher = createWatcher(csvFileName);
-    await watcher.initialize();
+    const watcher = createWatcher();
+    await watcher.initialize(csvFileName);
 
     expect(conditionalStorageMock.createCondition).not.toHaveBeenCalled();
 
@@ -421,7 +420,6 @@ describe('YamlConditionalFileWatcher', () => {
       .mockImplementation(() => csvFileRoles);
 
     const watcher = createWatcher();
-    await watcher.initialize();
     await watcher.cleanUpConditionalPolicies();
 
     expect(conditionalStorageMock.createCondition).not.toHaveBeenCalled();
@@ -447,7 +445,6 @@ describe('YamlConditionalFileWatcher', () => {
       .mockImplementation(() => csvFileRoles);
 
     const watcher = createWatcher();
-    await watcher.initialize();
     await watcher.cleanUpConditionalPolicies();
 
     expect(conditionalStorageMock.createCondition).not.toHaveBeenCalled();
