@@ -8848,32 +8848,6 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@janus-idp/backstage-plugin-keycloak-backend@workspace:plugins/keycloak-backend":
-  version: 0.0.0-use.local
-  resolution: "@janus-idp/backstage-plugin-keycloak-backend@workspace:plugins/keycloak-backend"
-  dependencies:
-    "@backstage/backend-defaults": 0.5.0
-    "@backstage/backend-plugin-api": ^1.0.0
-    "@backstage/backend-test-utils": 1.0.0
-    "@backstage/catalog-model": ^1.7.0
-    "@backstage/cli": 0.27.1
-    "@backstage/config": 1.2.0
-    "@backstage/errors": ^1.2.4
-    "@backstage/plugin-catalog-backend": 1.26.1
-    "@backstage/plugin-catalog-node": ^1.13.0
-    "@janus-idp/cli": 1.16.0
-    "@keycloak/keycloak-admin-client": 24.0.5
-    "@types/lodash": 4.17.5
-    "@types/uuid": 9.0.8
-    deepmerge: 4.3.1
-    inclusion: ^1.0.1
-    lodash: ^4.17.21
-    pg-format: ^1.0.4
-    prettier: 3.3.3
-    uuid: ^9.0.1
-  languageName: unknown
-  linkType: soft
-
 "@janus-idp/backstage-plugin-kiali-backend@workspace:plugins/kiali-backend":
   version: 0.0.0-use.local
   resolution: "@janus-idp/backstage-plugin-kiali-backend@workspace:plugins/kiali-backend"
@@ -12110,6 +12084,32 @@ __metadata:
   checksum: fd3737c12edf55b5c2279674664c3ed5e756410ea82e9cd324c3f0e032ed5ccd8df1959ec69ea97f2f1c9c33c884aae3d7a7108a73ea0faa90d74ea47cf364d4
   languageName: node
   linkType: hard
+
+"@oandriie/backstage-plugin-keycloak-backend@workspace:plugins/keycloak-backend":
+  version: 0.0.0-use.local
+  resolution: "@oandriie/backstage-plugin-keycloak-backend@workspace:plugins/keycloak-backend"
+  dependencies:
+    "@backstage/backend-defaults": 0.5.0
+    "@backstage/backend-plugin-api": ^1.0.0
+    "@backstage/backend-test-utils": 1.0.0
+    "@backstage/catalog-model": ^1.7.0
+    "@backstage/cli": 0.27.1
+    "@backstage/config": 1.2.0
+    "@backstage/errors": ^1.2.4
+    "@backstage/plugin-catalog-backend": 1.26.1
+    "@backstage/plugin-catalog-node": ^1.13.0
+    "@janus-idp/cli": 1.16.0
+    "@keycloak/keycloak-admin-client": 24.0.5
+    "@types/lodash": 4.17.5
+    "@types/uuid": 9.0.8
+    deepmerge: 4.3.1
+    inclusion: ^1.0.1
+    lodash: ^4.17.21
+    pg-format: ^1.0.4
+    prettier: 3.3.3
+    uuid: ^9.0.1
+  languageName: unknown
+  linkType: soft
 
 "@oclif/command@npm:^1.8.36":
   version: 1.8.36
