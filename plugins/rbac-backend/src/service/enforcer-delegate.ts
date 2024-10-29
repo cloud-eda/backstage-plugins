@@ -436,33 +436,35 @@ export class EnforcerDelegate implements RoleEventEmitter<RoleEvents> {
     action: string,
     roles: string[],
   ): Promise<boolean> {
-    const adapter = new StringAdapter('# Placeholder for policies');
-    const roleManager = this.enforcer.getRoleManager();
+    const tempEnforcer = new Enforcer();
+    const model = newModelFromString(MODEL);
 
-    const tempEnforcer = await newEnforcer(newModelFromString(MODEL), adapter);
-    tempEnforcer.setRoleManager(roleManager);
-    tempEnforcer.enableAutoBuildRoleLinks(false);
-    await tempEnforcer.buildRoleLinks();
-
+    // copy filtered policies from enforcer to tempEnforcer
+    // model.addPolicies('p', 'p', [['role:admin', 'data:resource', 'read', 'allow']]);
+    let policies: string[][] = [];
     if (roles.length > 0) {
       for (const role of roles) {
-        const polices = await this.enforcer.getFilteredPolicy(
+        const filteredRolePolicies = await this.enforcer.getFilteredPolicy(
           0,
           ...[role, resourceType, action],
         );
-        for (const policy of polices) {
-          await tempEnforcer.addPolicy(...policy);
-        }
+        policies.push(...filteredRolePolicies);
       }
     } else {
-      const polices = await this.enforcer.getFilteredPolicy(
+      policies = await this.enforcer.getFilteredPolicy(
         1,
         ...[resourceType, action],
       );
-      for (const policy of polices) {
-        await tempEnforcer.addPolicy(...policy);
-      }
     }
+    model.addPolicies('p', 'p', policies);
+
+    // init temp enforce with model only, without adapter at all...
+    await tempEnforcer.initWithModelAndAdapter(model, undefined, false);
+    // set up role manager for temp enforcer
+    const roleManager = this.enforcer.getRoleManager();
+    tempEnforcer.setRoleManager(roleManager);
+    tempEnforcer.enableAutoBuildRoleLinks(false);
+    await tempEnforcer.buildRoleLinks();
 
     return await tempEnforcer.enforce(entityRef, resourceType, action);
   }
