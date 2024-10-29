@@ -1,4 +1,9 @@
-import { Enforcer, newModelFromString } from 'casbin';
+import {
+  Enforcer,
+  newEnforcer,
+  newModelFromString,
+  StringAdapter,
+} from 'casbin';
 import { Knex } from 'knex';
 
 import EventEmitter from 'events';
@@ -431,26 +436,33 @@ export class EnforcerDelegate implements RoleEventEmitter<RoleEvents> {
     action: string,
     roles: string[],
   ): Promise<boolean> {
-    const filter = [];
-    if (roles.length > 0) {
-      roles.forEach(role => {
-        filter.push({ ptype: 'p', v0: role, v1: resourceType, v2: action });
-      });
-    } else {
-      filter.push({ ptype: 'p', v1: resourceType, v2: action });
-    }
-
-    const adapt = this.enforcer.getAdapter();
+    const adapter = new StringAdapter('# Placeholder for policies');
     const roleManager = this.enforcer.getRoleManager();
-    const tempEnforcer = new Enforcer();
-    await tempEnforcer.initWithModelAndAdapter(
-      newModelFromString(MODEL),
-      adapt,
-      true,
-    );
-    tempEnforcer.setRoleManager(roleManager);
 
-    await tempEnforcer.loadFilteredPolicy(filter);
+    const tempEnforcer = await newEnforcer(newModelFromString(MODEL), adapter);
+    tempEnforcer.setRoleManager(roleManager);
+    tempEnforcer.enableAutoBuildRoleLinks(false);
+    await tempEnforcer.buildRoleLinks();
+
+    if (roles.length > 0) {
+      for (const role of roles) {
+        const polices = await this.enforcer.getFilteredPolicy(
+          0,
+          ...[role, resourceType, action],
+        );
+        for (const policy of polices) {
+          await tempEnforcer.addPolicy(...policy);
+        }
+      }
+    } else {
+      const polices = await this.enforcer.getFilteredPolicy(
+        1,
+        ...[resourceType, action],
+      );
+      for (const policy of polices) {
+        await tempEnforcer.addPolicy(...policy);
+      }
+    }
 
     return await tempEnforcer.enforce(entityRef, resourceType, action);
   }
